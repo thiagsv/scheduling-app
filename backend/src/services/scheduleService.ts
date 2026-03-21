@@ -9,7 +9,7 @@ export const getSchedule = () => {
 
     const schedule: Record<string, Record<string, string[]>> = {};
     const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-    const BASE_ROLES = ["Cook", "Waiter", "Manager"];
+    const BASE_ROLES = ["Cook", "Waiter", "Manager", "Cleaner", "Dishwasher", "Host"];
 
     // Initialize full-week calendar view
     DAYS.forEach(day => {

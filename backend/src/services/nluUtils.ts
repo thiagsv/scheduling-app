@@ -1,7 +1,7 @@
 import { db } from "../db/database";
 
 export const DAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
-export const ROLES = ["cook", "waiter", "manager", "cleaner"];
+export const ROLES = ["cook", "waiter", "manager", "cleaner", "dishwasher", "host"];
 
 export const INTENTS = [
     { name: "create_schedule", keywords: ["create", "schedule", "shift"] },

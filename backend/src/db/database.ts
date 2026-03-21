@@ -20,31 +20,57 @@ db.exec(`
 
 const count = db.prepare('SELECT COUNT(*) as count FROM employees').get() as { count: number };
 if (count.count === 0) {
-    console.log("Seeding database with initial data (7 employees)...");
+    console.log("Seeding database with initial data (20 employees)...");
 
     const insertEmployee = db.prepare('INSERT INTO employees (name, role) VALUES (?, ?)');
-    insertEmployee.run('John', 'cook');
-    insertEmployee.run('Jane', 'cook');
-    insertEmployee.run('Mike', 'waiter');
-    insertEmployee.run('Emily', 'waiter');
-    insertEmployee.run('Chris', 'waiter');
-    insertEmployee.run('Sarah', 'manager');
-    insertEmployee.run('David', 'manager');
+    const employees = [
+        { name: 'John', role: 'cook' },
+        { name: 'Jane', role: 'cook' },
+        { name: 'Mike', role: 'cook' },
+        { name: 'Emily', role: 'cook' },
+        { name: 'Chris', role: 'waiter' },
+        { name: 'Sarah', role: 'waiter' },
+        { name: 'David', role: 'waiter' },
+        { name: 'Anna', role: 'waiter' },
+        { name: 'Robert', role: 'waiter' },
+        { name: 'Lisa', role: 'waiter' },
+        { name: 'Kevin', role: 'manager' },
+        { name: 'Sofia', role: 'manager' },
+        { name: 'Daniel', role: 'cleaner' },
+        { name: 'Maria', role: 'cleaner' },
+        { name: 'Paul', role: 'cleaner' },
+        { name: 'Laura', role: 'dishwasher' },
+        { name: 'James', role: 'dishwasher' },
+        { name: 'Emma', role: 'dishwasher' },
+        { name: 'Tom', role: 'host' },
+        { name: 'Alice', role: 'host' }
+    ];
+
+    for (const emp of employees) {
+        insertEmployee.run(emp.name, emp.role);
+    }
 
     const insertShift = db.prepare('INSERT INTO shifts (day, role, employee_id) VALUES (?, ?, ?)');
+    const days = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
+    const roles = ["cook", "waiter", "manager", "cleaner", "dishwasher", "host"];
 
-    // Empty slots for Tueday
-    insertShift.run('tuesday', 'cook', null);
-    insertShift.run('tuesday', 'cook', null);
-    insertShift.run('tuesday', 'waiter', null);
-    insertShift.run('tuesday', 'waiter', null);
-    insertShift.run('tuesday', 'manager', null);
+    for (const day of days) {
+        for (const role of roles) {
+            insertShift.run(day, role, null);
+        }
+    }
 
-    // Some pre-filled slots for Monday to show diversity
+    // Pre-fill some shifts to show diversity
     const johnId = db.prepare('SELECT id FROM employees WHERE name = ?').get('John') as { id: number };
-    insertShift.run('monday', 'cook', johnId.id); // John works Monday
-    insertShift.run('monday', 'cook', null);
-    insertShift.run('monday', 'waiter', null);
-    insertShift.run('monday', 'waiter', null);
-    insertShift.run('monday', 'manager', null);
+    const emilyId = db.prepare('SELECT id FROM employees WHERE name = ?').get('Emily') as { id: number };
+    const sarahId = db.prepare('SELECT id FROM employees WHERE name = ?').get('Sarah') as { id: number };
+    const lauraId = db.prepare('SELECT id FROM employees WHERE name = ?').get('Laura') as { id: number };
+    const tomId = db.prepare('SELECT id FROM employees WHERE name = ?').get('Tom') as { id: number };
+
+    // Update some shifts with employees
+    db.prepare(`UPDATE shifts SET employee_id = ? WHERE day = 'monday' AND role = 'cook'`).run(johnId.id);
+    db.prepare(`UPDATE shifts SET employee_id = ? WHERE day = 'tuesday' AND role = 'cook'`).run(emilyId.id);
+    db.prepare(`UPDATE shifts SET employee_id = ? WHERE day = 'wednesday' AND role = 'waiter'`).run(sarahId.id);
+    db.prepare(`UPDATE shifts SET employee_id = ? WHERE day = 'thursday' AND role = 'dishwasher'`).run(lauraId.id);
+    db.prepare(`UPDATE shifts SET employee_id = ? WHERE day = 'friday' AND role = 'host'`).run(tomId.id);
 }
