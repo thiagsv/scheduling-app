@@ -83,6 +83,10 @@ function extractEntities(intent: IntentName, words: string[]): Command | ErrorRe
 
         case "fill_schedule": {
             if (!normalizedDay) return missingInfoError;
+
+            const foundEmp = words.map(w => findBestMatch(w, empNames, 2)).find(match => match);
+            if (foundEmp) return { intent: "assign", employee: foundEmp, day: normalizedDay };
+
             return { intent: "fill_schedule", day: normalizedDay };
         }
 
