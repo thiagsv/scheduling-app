@@ -1,30 +1,70 @@
-# Scheduling App
+# Workforce Scheduling System
 
-A smart scheduling application that uses natural language to manage team shifts.
+A technical demonstration of a scheduling application that process natural language commands to manage workforce shifts.
 
-## How to Run
+## Technical Overview
 
-1. **Install dependencies**:
+The system is built on a Client-Server architecture, utilizing a React-based frontend and a Node.js/Express backend with an integrated SQLite database for persistence.
+
+### Key Components
+
+#### Intent-Based Command Processor
+The application interprets plain English commands through a backend processing layer. It uses regex-based classification to identify user intent (e.g., `CREATE_SCHEDULE`, `FILL_SCHEDULE`, `SWAP_SHIFT`) and extracts relevant parameters such as days and roles.
+
+#### Scheduling Engine
+The core business logic resides in the `ScheduleEngine` service. Its responsibilities include:
+- **Role Validation**: Ensuring that only employees with the correct role (Cook, Waiter, Manager) are assigned to specific shifts.
+- **Conflict Management**: Preventing an employee from being assigned to multiple positions on the same day.
+- **Automated Fill Logic**: Identifying empty slots and populating them based on available staff and role requirements.
+
+#### Data Persistence
+SQLite was selected using the `better-sqlite3` driver to ensure a "zero-configuration" setup for evaluators, while maintaining relational integrity between employees and shifts.
+
+---
+
+## Technical Stack
+
+### Backend
+- **Runtime**: Node.js
+- **Framework**: Express.js
+- **Language**: TypeScript
+- **Database**: SQLite (better-sqlite3)
+
+### Frontend
+- **Library**: React (Functional Components & Hooks)
+- **Build Tool**: Vite
+- **Styling**: Standard CSS (Modular approach)
+
+---
+
+## Setup and Installation
+
+### Prerequisites
+- Node.js (v18 or higher)
+- npm
+
+### Installation Steps
+
+1. **Install dependencies for both projects**:
    ```bash
    npm run install:all
    ```
 
-2. **Run the application**:
+2. **Initialize and run the development environment**:
    ```bash
    npm run dev
    ```
-   *The app will be available at [http://localhost:5173](http://localhost:5173)*
 
-## Features
+The application will be accessible at:
+- Frontend: http://localhost:5173
+- Backend API: http://localhost:3000
 
-- **Chat-Based Commands**: No buttons! Tell the app to create, fill, or swap shifts using plain English.
-- **Smart Scaling**: Automatic filling of gaps based on employee roles and current workload.
-- **Conflict Prevention**: Prevents double-booking and ensures role matching.
-- **Persistence**: Powered by SQLite for local data storage.
+---
 
-## Stack
+## Usage Examples
 
-- **Frontend**: React + Vite + Tailwind CSS
-- **Backend**: Node.js + Express + TypeScript
-- **Database**: SQLite (better-sqlite3)
-
+The system accepts commands through the integrated chat interface. Examples include:
+- "Create schedule Saturday with 2 cooks"
+- "Fill schedule Sunday"
+- "Swap employee1 with employee2 on Saturday"
+- "Complete schedule Saturday"
