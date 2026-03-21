@@ -25,7 +25,7 @@ function detectIntent(words: string[]): IntentName | null {
         for (const keyword of intent.keywords) {
             if (words.includes(keyword)) score++;
         }
-        
+
         for (const word of words) {
             if (DAYS.includes(word) || ROLES.includes(word) || findBestMatch(word, empNames, 1)) {
                 score += 0.5;
@@ -44,7 +44,7 @@ function detectIntent(words: string[]): IntentName | null {
 function extractEntities(intent: IntentName, words: string[]): Command | ErrorResponse {
     const missingInfoError: ErrorResponse = { type: "error", message: "Missing required information" };
     const empNames = getEmployeeNames();
-    
+
     // Helper to find day
     const day = words.find(w => DAYS.includes(w)) || words.find(w => findBestMatch(w, DAYS, 2));
     const normalizedDay = day ? (DAYS.includes(day) ? day : findBestMatch(day, DAYS, 2)) : undefined;
@@ -62,7 +62,7 @@ function extractEntities(intent: IntentName, words: string[]): Command | ErrorRe
                 }
 
                 if (words[i + 1]) {
-                    const role = ROLES.find(r => words[i+1].startsWith(r)) || findBestMatch(words[i+1], ROLES, 2);
+                    const role = ROLES.find(r => words[i + 1].startsWith(r)) || findBestMatch(words[i + 1], ROLES, 2);
                     if (role) roles.push({ role, count });
                 }
             }
@@ -82,20 +82,19 @@ function extractEntities(intent: IntentName, words: string[]): Command | ErrorRe
         }
 
         case "fill_schedule": {
-            if (!normalizedDay) return missingInfoError;
-
             const foundEmp = words.map(w => findBestMatch(w, empNames, 2)).find(match => match);
             if (foundEmp) return { intent: "assign", employee: foundEmp, day: normalizedDay };
 
-            return { intent: "fill_schedule", day: normalizedDay };
+            const foundRole = words.map(w => findBestMatch(w, ROLES, 1)).find(match => match);
+            return { intent: "fill_schedule", day: normalizedDay, role: foundRole };
         }
 
         case "swap": {
             const swapKeywords = ["swap", "replace", "change", "switch"];
             const actionIdx = words.findIndex(w => swapKeywords.includes(w));
-            
+
             let from = actionIdx !== -1 && words[actionIdx + 1] ? findBestMatch(words[actionIdx + 1], empNames, 2) || words[actionIdx + 1] : undefined;
-            
+
             const withIdx = words.findIndex(w => ["with", "for", "in", "on", "and", "by"].includes(w));
             let to = withIdx !== -1 && words[withIdx + 1] ? findBestMatch(words[withIdx + 1], empNames, 2) || words[withIdx + 1] : undefined;
             if (!to && actionIdx !== -1) to = findBestMatch(words[actionIdx + 2], empNames, 2) || words[actionIdx + 2];
@@ -108,7 +107,7 @@ function extractEntities(intent: IntentName, words: string[]): Command | ErrorRe
             const finalRole = words.slice().reverse().map(w => findBestMatch(w, ROLES, 1)).find(m => m);
             const stopwords = ["create", "add", "new", "hire", "employee", "worker", "user", "as", "a", "an", "the", "with", "role"];
             const finalName = words.find(w => !stopwords.includes(w) && !findBestMatch(w, ROLES, 1));
-            
+
             if (!finalRole || !finalName) return missingInfoError;
             return { intent: "create_employee", name: finalName, role: finalRole };
         }
@@ -119,11 +118,11 @@ function extractEntities(intent: IntentName, words: string[]): Command | ErrorRe
 
             const nameIdx = words.indexOf(currentName);
             const newRole = words.filter((_, i) => i !== nameIdx).map(w => findBestMatch(w, ROLES, 1)).find(m => m);
-            
+
             let newName: string | undefined;
             const toIdx = words.lastIndexOf("to");
             if (toIdx !== -1 && toIdx > nameIdx && words[toIdx + 1]) {
-                if (!findBestMatch(words[toIdx+1], ROLES, 1) || words.includes("name")) {
+                if (!findBestMatch(words[toIdx + 1], ROLES, 1) || words.includes("name")) {
                     newName = words[toIdx + 1];
                 }
             }

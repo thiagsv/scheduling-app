@@ -19,9 +19,9 @@ export type Assignment = {
 
 export type Command =
     | { intent: "create_schedule"; day: string; roles: { role: string; count: number }[] }
-    | { intent: "fill_schedule"; day: string }
+    | { intent: "fill_schedule"; day?: string; role?: string }
     | { intent: "swap"; from: string; to: string; day?: string }
-    | { intent: "assign"; employee: string; day: string }
+    | { intent: "assign"; employee: string; day?: string }
     | { intent: "create_employee"; name: string; role: string }
     | { intent: "update_employee"; name: string; newName?: string; newRole?: string };
 

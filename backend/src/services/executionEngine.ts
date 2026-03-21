@@ -21,24 +21,40 @@ export const executeCommand = (command: Command) => {
             if (!emp) throw new Error("Employee not found for assignment");
 
             const allShifts = db.prepare(`SELECT id, role, day, employee_id FROM shifts`).all() as (Shift & { employee_id: number | null })[];
+            
+            const assignToDay = (day: string) => {
+                const currentAssignments: Assignment[] = allShifts
+                    .filter(s => s.employee_id !== null)
+                    .map(s => ({ employeeId: s.employee_id!, shiftId: s.id }));
 
-            const currentAssignments: Assignment[] = allShifts
-                .filter(s => s.employee_id !== null)
-                .map(s => ({ employeeId: s.employee_id!, shiftId: s.id }));
+                // Prevent double booking
+                if (engine.isDoubleBooked(emp.id, { day } as Shift, currentAssignments, allShifts)) {
+                    return; // Skip if already booked on this day
+                }
 
-            // Prevent double booking
-            if (engine.isDoubleBooked(emp.id, { day: command.day } as Shift, currentAssignments, allShifts)) {
-                throw new Error(`${emp.name} is already scheduled on ${command.day}.`);
-            }
+                // Try to fill an existing empty slot
+                const emptySlot = allShifts.find(s => s.day === day && s.role === emp.role && s.employee_id === null);
 
-            // Try to fill an existing empty slot
-            const emptySlot = allShifts.find(s => s.day === command.day && s.role === emp.role && s.employee_id === null);
+                if (emptySlot) {
+                    db.prepare(`UPDATE shifts SET employee_id = ? WHERE id = ?`).run(emp.id, emptySlot.id);
+                    emptySlot.employee_id = emp.id; // Update local state for subsequent checks
+                } else if (command.intent === "assign") {
+                    // Only create a new slot if intent was explicitly 'assign' with a day
+                    // If it was a generic 'fill John', we only fill existing slots
+                    if (command.day) {
+                        db.prepare(`INSERT INTO shifts (day, role, employee_id) VALUES (?, ?, ?)`).run(day, emp.role, emp.id);
+                    }
+                }
+            };
 
-            if (emptySlot) {
-                db.prepare(`UPDATE shifts SET employee_id = ? WHERE id = ?`).run(emp.id, emptySlot.id);
+            if (command.day) {
+                assignToDay(command.day);
             } else {
-                // Or create a new slot specifically forced for them
-                db.prepare(`INSERT INTO shifts (day, role, employee_id) VALUES (?, ?, ?)`).run(command.day, emp.role, emp.id);
+                // Fill all empty slots for this employee's role across all days
+                const days = [...new Set(allShifts.map(s => s.day))];
+                for (const d of days) {
+                    assignToDay(d);
+                }
             }
             break;
         }
@@ -50,7 +66,13 @@ export const executeCommand = (command: Command) => {
                 .filter(s => s.employee_id !== null)
                 .map(s => ({ employeeId: s.employee_id!, shiftId: s.id }));
 
-            const shiftsToFill = allShifts.filter(s => s.day === command.day);
+            let shiftsToFill = command.day 
+                ? allShifts.filter(s => s.day === command.day)
+                : allShifts;
+
+            if (command.role) {
+                shiftsToFill = shiftsToFill.filter(s => s.role === command.role);
+            }
 
             const newAssignments = engine.autoFill(shiftsToFill, allEmployees, currentAssignments, allShifts);
 

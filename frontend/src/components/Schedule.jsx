@@ -21,7 +21,7 @@ export default function Schedule({ schedule }) {
                         {Object.entries(roles).map(([role, people]) => (
                             <div
                                 key={role}
-                                className="bg-white border border-gray-100 rounded-2xl p-5 md:p-6 shadow-sm hover:shadow-md hover:-translate-y-[2px] transition-all duration-200 min-h-[140px] max-h-[180px] overflow-hidden"
+                                className="bg-white border border-gray-100 rounded-2xl p-5 md:p-6 shadow-sm hover:shadow-md hover:-translate-y-[2px] transition-all duration-200 min-h-[140px] max-h-[180px] overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
                             >
                                 <div className="flex justify-between items-center mb-3 md:mb-4">
                                     <span className="text-sm md:text-base font-medium">
