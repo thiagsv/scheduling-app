@@ -1,13 +1,23 @@
 {
-  "name": "scheduling-app-root",
+  "name": "scheduling-app",
   "version": "1.0.0",
-  "private": true,
+  "description": "A smart scheduling application that uses natural language to manage team shifts.",
+  "main": "index.js",
   "scripts": {
-    "dev": "concurrently \"npm run dev --prefix backend\" \"npm run dev --prefix frontend\"",
-    "install:all": "npm install --prefix backend && npm install --prefix frontend",
-    "backend": "npm run dev --prefix backend",
-    "frontend": "npm run dev --prefix frontend"
+    "dev": "concurrently \"npm run dev --prefix backend\" \"npm run dev --prefix frontend\""
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/thiagsv/scheduling-app.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/thiagsv/scheduling-app/issues"
+  },
+  "homepage": "https://github.com/thiagsv/scheduling-app#readme",
   "devDependencies": {
     "concurrently": "^9.2.1"
   }
