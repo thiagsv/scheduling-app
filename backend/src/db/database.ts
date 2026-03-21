@@ -2,7 +2,7 @@ import Database from "better-sqlite3"
 
 export const db = new Database("database.db")
 
-// cria tabelas
+// Create tables
 db.exec(`
   DROP TABLE IF EXISTS shifts;
   DROP TABLE IF EXISTS employees;

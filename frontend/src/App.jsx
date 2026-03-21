@@ -8,12 +8,12 @@ export default function App() {
 
     const [schedule] = useState({
         Saturday: {
-            Cook: ["João", "Maria"],
-            Waiter: ["Pedro", "Ana"],
-            Manager: ["Lucas"],
+            Cook: ["John", "Mary"],
+            Waiter: ["Peter", "Ann"],
+            Manager: ["Luke"],
         },
         Sunday: {
-            Cook: ["Carlos"],
+            Cook: ["Charles"],
             Waiter: ["Fernanda"],
             Manager: [],
         },
@@ -27,9 +27,12 @@ export default function App() {
     }, []);
 
     const suggestions = [
-        "Add 2 cooks on Sunday",
-        "Assign João to Sunday",
-        "Swap Maria with Pedro",
+        "Create schedule Saturday with 2 cooks",
+        "Create schedule Sunday with 1 manager and 3 waiters",
+        "Fill schedule Saturday",
+        "Complete schedule Sunday",
+        "Swap employee1 with employee2 on Saturday",
+        "Replace worker in Sunday schedule",
     ];
 
     const handleSend = async () => {
@@ -47,22 +50,26 @@ export default function App() {
                 body: JSON.stringify({ command: input }),
             });
 
+            const data = await res.json();
+
             if (!res.ok) {
                 setMessages((prev) => [
                     ...prev,
                     {
-                        text: "Comando não implementado ainda (ignorando /command por enquanto).",
+                        text: data.message || "Error processing command.",
                         role: "ai",
                     },
                 ]);
                 return;
             }
 
-            const data = await res.json();
-
             setMessages((prev) => [
                 ...prev,
-                { text: data.message || "Done", role: "ai" },
+                { 
+                    text: `Command interpreted: ${data.intent.replace(/_/g, ' ')}`, 
+                    role: "ai",
+                    data: data // Store data for future UI updates
+                },
             ]);
         } catch (err) {
             setMessages((prev) => [
