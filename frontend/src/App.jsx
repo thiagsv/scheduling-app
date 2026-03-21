@@ -9,21 +9,20 @@ export default function App() {
     const [schedule, setSchedule] = useState({});
     const [employees, setEmployees] = useState([]);
 
-    useEffect(() => {
-        // Fetch employees
+    const fetchData = () => {
         fetch("/employees")
             .then((res) => res.json())
             .then((data) => setEmployees(data))
             .catch((err) => console.error("Error fetching employees:", err));
 
-        // Fetch initial schedule from database
         fetch("/schedule")
             .then((res) => res.json())
-            .then((data) => {
-                setSchedule(data);
-                console.log("Schedule loaded:", data);
-            })
+            .then((data) => setSchedule(data))
             .catch((err) => console.error("Error fetching schedule:", err));
+    };
+
+    useEffect(() => {
+        fetchData();
     }, []);
 
     const suggestions = [
@@ -63,13 +62,8 @@ export default function App() {
                 return;
             }
 
-            // Update schedule and employees dynamically from backend response
-            if (data.schedule) {
-                setSchedule(data.schedule);
-            }
-            if (data.employees) {
-                setEmployees(data.employees);
-            }
+            // Silently refetch data in background as part of standard state invalidation
+            fetchData();
 
             setMessages((prev) => [
                 ...prev,

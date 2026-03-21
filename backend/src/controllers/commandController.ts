@@ -25,8 +25,6 @@ export const handleCommand = (req: Request, res: Response) => {
 
         res.status(200).json({
             intent: validCommand.intent,
-            schedule: result.schedule,
-            employees: result.employees,
             message: `Command executed: ${validCommand.intent}`
         });
 

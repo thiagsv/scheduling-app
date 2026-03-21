@@ -11,7 +11,7 @@ export const getSchedule = () => {
     const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
     const BASE_ROLES = ["Cook", "Waiter", "Manager"];
 
-    // Inicializa a visão completa (full-week calendar)
+    // Initialize full-week calendar view
     DAYS.forEach(day => {
         schedule[day] = {};
         BASE_ROLES.forEach(role => {

@@ -11,6 +11,11 @@ export type ErrorResponse = {
     message: string;
 };
 
+const defaultError: ErrorResponse = {
+    type: "error",
+    message: "I understood what you tried to do, but some information is missing (like name, role, or day). Can you rewrite it?"
+};
+
 const INTENTS = [
     { name: "create_schedule", keywords: ["create", "schedule", "shift"] },
     { name: "fill_schedule", keywords: ["fill", "complete", "schedule"] },

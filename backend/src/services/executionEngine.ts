@@ -52,7 +52,7 @@ export const executeCommand = (command: Command) => {
             const toEmp = db.prepare(`SELECT id, role FROM employees WHERE name = ? COLLATE NOCASE`).get(command.to) as any;
 
             if (!fromEmp || !toEmp) {
-                throw new Error("Colaboradores não encontrados no banco.");
+                throw new Error("Employees not found in database.");
             }
 
             if (command.day) {
@@ -82,8 +82,5 @@ export const executeCommand = (command: Command) => {
         }
     }
 
-    return {
-        schedule: getSchedule(),
-        employees: db.prepare(`SELECT * FROM employees`).all()
-    };
+    return { success: true };
 };
