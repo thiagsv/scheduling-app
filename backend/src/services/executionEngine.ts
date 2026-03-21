@@ -18,6 +18,10 @@ export const executeCommand = (command: Command) => {
             const emp = db.prepare(`SELECT * FROM employees WHERE name = ? COLLATE NOCASE`).get(command.employee) as any;
             if (!emp) throw new Error("Employee not found for assignment");
             
+            // PREVENT DOUBLE BOOKING
+            const existingShift = db.prepare(`SELECT id FROM shifts WHERE day = ? AND employee_id = ?`).get(command.day, emp.id);
+            if (existingShift) throw new Error(`${emp.name} is already scheduled on ${command.day}.`);
+
             // Try to fill an existing empty slot
             const emptySlot = db.prepare(`SELECT id FROM shifts WHERE day = ? AND role = ? AND employee_id IS NULL LIMIT 1`).get(command.day, emp.role) as any;
             
@@ -49,15 +53,22 @@ export const executeCommand = (command: Command) => {
         }
         case "swap": {
             const fromEmp = db.prepare(`SELECT id FROM employees WHERE name = ? COLLATE NOCASE`).get(command.from) as any;
-            const toEmp = db.prepare(`SELECT id, role FROM employees WHERE name = ? COLLATE NOCASE`).get(command.to) as any;
+            const toEmp = db.prepare(`SELECT id, role, name FROM employees WHERE name = ? COLLATE NOCASE`).get(command.to) as any;
 
             if (!fromEmp || !toEmp) {
                 throw new Error("Employees not found in database.");
             }
 
             if (command.day) {
+                const existingShift = db.prepare(`SELECT id FROM shifts WHERE day = ? AND employee_id = ?`).get(command.day, toEmp.id);
+                if (existingShift) throw new Error(`${toEmp.name} is already scheduled on ${command.day}.`);
                 db.prepare(`UPDATE shifts SET employee_id = ? WHERE employee_id = ? AND day = ?`).run(toEmp.id, fromEmp.id, command.day);
             } else {
+                const fromShifts = db.prepare(`SELECT day FROM shifts WHERE employee_id = ?`).all(fromEmp.id) as any[];
+                for (const shift of fromShifts) {
+                    const existing = db.prepare(`SELECT id FROM shifts WHERE day = ? AND employee_id = ?`).get(shift.day, toEmp.id);
+                    if (existing) throw new Error(`${toEmp.name} is already scheduled on ${shift.day}.`);
+                }
                 db.prepare(`UPDATE shifts SET employee_id = ? WHERE employee_id = ?`).run(toEmp.id, fromEmp.id);
             }
             break;

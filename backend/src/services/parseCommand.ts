@@ -19,7 +19,8 @@ const defaultError: ErrorResponse = {
 const INTENTS = [
     { name: "create_schedule", keywords: ["create", "schedule", "shift"] },
     { name: "fill_schedule", keywords: ["fill", "complete", "schedule"] },
-    { name: "swap", keywords: ["swap", "replace", "change"] },
+    { name: "swap", keywords: ["swap", "replace", "switch"] },
+    { name: "assign", keywords: ["assign", "put", "add", "set", "allocate"] },
     { name: "create_employee", keywords: ["create", "add", "new", "hire", "employee", "worker", "user"] },
     { name: "update_employee", keywords: ["update", "edit", "change", "employee", "role", "name"] }
 ] as const;
@@ -134,7 +135,6 @@ function extractEntities(intent: IntentName, words: string[]): Command | ErrorRe
             }
 
             if (roles.length === 0) {
-                // Handle "create schedule saturday with jhon"
                 const empNames = getEmployeeNames();
                 let foundEmp = null;
                 for (const w of words) {
@@ -152,6 +152,28 @@ function extractEntities(intent: IntentName, words: string[]): Command | ErrorRe
             return { intent: "create_schedule", day, roles };
         }
 
+        case "assign": {
+            const empNames = getEmployeeNames();
+            let finalName: string | undefined;
+            for (const w of words) {
+                const match = findBestMatch(w, empNames, 1);
+                if (match) {
+                    finalName = match;
+                    break;
+                }
+            }
+
+            let day = words.find((w) => DAYS.includes(w));
+            if (!day) {
+                const fuzzyDay = words.find(w => findBestMatch(w, DAYS, 2));
+                day = fuzzyDay ? findBestMatch(fuzzyDay, DAYS, 2) || undefined : undefined;
+            }
+
+            if (!finalName || !day) return defaultError;
+
+            return { intent: "assign", employee: finalName, day };
+        }
+
         case "fill_schedule": {
             const day = words.find((w) => DAYS.includes(w));
             if (!day) return defaultError;
@@ -160,21 +182,29 @@ function extractEntities(intent: IntentName, words: string[]): Command | ErrorRe
         }
 
         case "swap": {
-            const swapKeywords = ["swap", "replace", "change"];
+            const empNames = getEmployeeNames();
+            const swapKeywords = ["swap", "replace", "change", "switch"];
             const actionWord = words.find((w) => swapKeywords.includes(w));
             const actionIdx = actionWord ? words.indexOf(actionWord) : -1;
 
-            const from = words[actionIdx + 1];
+            let from: string | undefined;
+            if (actionIdx !== -1 && words[actionIdx + 1]) {
+                from = findBestMatch(words[actionIdx + 1], empNames, 2) || words[actionIdx + 1];
+            }
             
-            let to;
-            const withIdx = words.findIndex((w) => ["with", "for", "in", "on"].includes(w));
-            if (withIdx !== -1) {
-                to = words[withIdx + 1];
-            } else {
-                to = words[actionIdx + 2];
+            let to: string | undefined;
+            const withIdx = words.findIndex((w) => ["with", "for", "in", "on", "and", "by"].includes(w));
+            if (withIdx !== -1 && words[withIdx + 1]) {
+                to = findBestMatch(words[withIdx + 1], empNames, 2) || words[withIdx + 1];
+            } else if (actionIdx !== -1 && words[actionIdx + 2]) {
+                to = findBestMatch(words[actionIdx + 2], empNames, 2) || words[actionIdx + 2];
             }
 
-            const day = words.find((w) => DAYS.includes(w));
+            let day = words.find((w) => DAYS.includes(w));
+            if (!day) {
+                const fuzzyDay = words.find(w => findBestMatch(w, DAYS, 2));
+                day = fuzzyDay ? findBestMatch(fuzzyDay, DAYS, 2) || undefined : undefined;
+            }
 
             if (!from || !to) {
                 return defaultError;

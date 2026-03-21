@@ -2,7 +2,6 @@ import Database from "better-sqlite3"
 
 export const db = new Database("database.db")
 
-// Create tables
 db.exec(`
     CREATE TABLE IF NOT EXISTS employees (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -22,7 +21,7 @@ db.exec(`
 const count = db.prepare('SELECT COUNT(*) as count FROM employees').get() as { count: number };
 if (count.count === 0) {
     console.log("Seeding database with initial data (7 employees)...");
-    
+
     const insertEmployee = db.prepare('INSERT INTO employees (name, role) VALUES (?, ?)');
     insertEmployee.run('John', 'cook');
     insertEmployee.run('Jane', 'cook');
@@ -33,19 +32,19 @@ if (count.count === 0) {
     insertEmployee.run('David', 'manager');
 
     const insertShift = db.prepare('INSERT INTO shifts (day, role, employee_id) VALUES (?, ?, ?)');
-    
-    // Empty slots for Saturday
-    insertShift.run('saturday', 'cook', null);
-    insertShift.run('saturday', 'cook', null);
-    insertShift.run('saturday', 'waiter', null);
-    insertShift.run('saturday', 'waiter', null);
-    insertShift.run('saturday', 'manager', null);
 
-    // Some pre-filled slots for Sunday to show diversity
+    // Empty slots for Tueday
+    insertShift.run('tuesday', 'cook', null);
+    insertShift.run('tuesday', 'cook', null);
+    insertShift.run('tuesday', 'waiter', null);
+    insertShift.run('tuesday', 'waiter', null);
+    insertShift.run('tuesday', 'manager', null);
+
+    // Some pre-filled slots for Monday to show diversity
     const johnId = db.prepare('SELECT id FROM employees WHERE name = ?').get('John') as { id: number };
-    insertShift.run('sunday', 'cook', johnId.id); // John works Sunday
-    insertShift.run('sunday', 'cook', null);
-    insertShift.run('sunday', 'waiter', null);
-    insertShift.run('sunday', 'waiter', null);
-    insertShift.run('sunday', 'manager', null);
+    insertShift.run('monday', 'cook', johnId.id); // John works Monday
+    insertShift.run('monday', 'cook', null);
+    insertShift.run('monday', 'waiter', null);
+    insertShift.run('monday', 'waiter', null);
+    insertShift.run('monday', 'manager', null);
 }
