@@ -62,7 +62,21 @@ export const executeCommand = (command: Command) => {
             }
             break;
         }
+        case "create_employee": {
+            const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.substring(1);
+            db.prepare(`INSERT INTO employees (name, role) VALUES (?, ?)`).run(capitalize(command.name), command.role);
+            break;
+        }
+        case "update_employee": {
+            const emp = db.prepare(`SELECT * FROM employees WHERE name = ? COLLATE NOCASE`).get(command.name) as any;
+            if (!emp) throw new Error("Employee not found");
+            db.prepare(`UPDATE employees SET role = ? WHERE id = ?`).run(command.role, emp.id);
+            break;
+        }
     }
 
-    return getSchedule();
+    return {
+        schedule: getSchedule(),
+        employees: db.prepare(`SELECT * FROM employees`).all()
+    };
 };

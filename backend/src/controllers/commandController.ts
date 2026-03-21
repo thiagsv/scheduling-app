@@ -21,11 +21,12 @@ export const handleCommand = (req: Request, res: Response) => {
         const validCommand = parsedResult as any;
 
         // Action the command in the database
-        const newSchedule = executeCommand(validCommand);
+        const result = executeCommand(validCommand);
 
         res.status(200).json({
             intent: validCommand.intent,
-            schedule: newSchedule,
+            schedule: result.schedule,
+            employees: result.employees,
             message: `Command executed: ${validCommand.intent}`
         });
 

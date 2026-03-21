@@ -63,9 +63,12 @@ export default function App() {
                 return;
             }
 
-            // Update schedule dynamically from backend response
+            // Update schedule and employees dynamically from backend response
             if (data.schedule) {
                 setSchedule(data.schedule);
+            }
+            if (data.employees) {
+                setEmployees(data.employees);
             }
 
             setMessages((prev) => [

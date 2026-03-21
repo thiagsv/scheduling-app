@@ -22,7 +22,7 @@ const INTENTS = [
 type IntentName = (typeof INTENTS)[number]["name"];
 
 const DAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
-const ROLES = ["cook", "waiter", "manager", "cleaner", "employee", "worker"]; 
+const ROLES = ["cook", "waiter", "manager", "cleaner"]; 
 
 function normalize(input: string): string[] {
     return input
@@ -167,6 +167,55 @@ function extractEntities(intent: IntentName, words: string[]): Command | ErrorRe
 
             return { intent: "swap", from, to, day };
         }
+        case "create_employee": {
+            const stopwords = ["create", "add", "new", "hire", "employee", "worker", "user", "as", "a", "an", "the", "with", "role"];
+            let finalRole: string | undefined;
+            for (let i = words.length - 1; i >= 0; i--) {
+                const match = findBestMatch(words[i], ROLES, 1);
+                if (match) {
+                    finalRole = match;
+                    break;
+                }
+            }
+            if (!finalRole) return defaultError;
+
+            let finalName: string | undefined;
+            for (const w of words) {
+                if (!stopwords.includes(w) && findBestMatch(w, ROLES, 1) === null) {
+                    finalName = w;
+                    break;
+                }
+            }
+            if (!finalName) return defaultError;
+
+            return { intent: "create_employee", name: finalName, role: finalRole };
+        }
+        case "update_employee": {
+            let finalRole: string | undefined;
+            for (let i = words.length - 1; i >= 0; i--) {
+                const match = findBestMatch(words[i], ROLES, 1);
+                if (match) {
+                    finalRole = match;
+                    break;
+                }
+            }
+            if (!finalRole) return defaultError;
+
+            const empNames = getEmployeeNames();
+            let finalName: string | undefined;
+            for (const w of words) {
+                const match = findBestMatch(w, empNames, 1);
+                if (match) {
+                    finalName = match;
+                    break;
+                }
+            }
+            if (!finalName) return defaultError;
+
+            return { intent: "update_employee", name: finalName, role: finalRole };
+        }
+        default:
+            return defaultError;
     }
 }
 
