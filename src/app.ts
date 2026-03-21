@@ -1,5 +1,6 @@
 import express from "express"
 import employeeRoutes from "./routes/employeeRoutes"
+import shiftRoutes from "./routes/shiftRoutes"
 import "./db/database"
 
 const app = express()
@@ -9,8 +10,9 @@ app.get("/", (req, res) => {
     res.send("started")
 })
 
+app.use(employeeRoutes)
+app.use(shiftRoutes)
+
 app.listen(3000, () => {
     console.log("Server running on http://localhost:3000")
 })
-
-app.use(employeeRoutes)
