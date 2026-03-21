@@ -20,14 +20,13 @@ export const executeCommand = (command: Command) => {
             const emp = db.prepare(`SELECT * FROM employees WHERE name = ? COLLATE NOCASE`).get(command.employee) as any;
             if (!emp) throw new Error("Employee not found for assignment");
 
-            const allEmployees = db.prepare(`SELECT id, role FROM employees`).all() as Employee[];
             const allShifts = db.prepare(`SELECT id, role, day, employee_id FROM shifts`).all() as (Shift & { employee_id: number | null })[];
 
             const currentAssignments: Assignment[] = allShifts
                 .filter(s => s.employee_id !== null)
                 .map(s => ({ employeeId: s.employee_id!, shiftId: s.id }));
 
-            // PREVENT DOUBLE BOOKING
+            // Prevent double booking
             if (engine.isDoubleBooked(emp.id, { day: command.day } as Shift, currentAssignments, allShifts)) {
                 throw new Error(`${emp.name} is already scheduled on ${command.day}.`);
             }

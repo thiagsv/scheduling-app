@@ -7,10 +7,6 @@ import "./db/database"
 const app = express()
 app.use(express.json())
 
-app.get("/", (req, res) => {
-    res.send("started")
-})
-
 app.use(employeeRoutes)
 app.use(commandRoutes)
 app.use(scheduleRoutes)

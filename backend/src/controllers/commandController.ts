@@ -1,7 +1,6 @@
 import { Request, Response } from "express";
 import { parseCommand } from "../services/parseCommand";
 import { executeCommand } from "../services/executionEngine";
-import { Command, ErrorResponse } from "../types";
 
 export const handleCommand = (req: Request, res: Response) => {
     try {
