@@ -1,16 +1,17 @@
 import { db } from "../db/database"
 
-export const createEmployee = (name: string) => {
+export const createEmployee = (name: string, role: string) => {
     const stmt = db.prepare(`
-        INSERT INTO employees (name)
-        VALUES (?)
+        INSERT INTO employees (name, role)
+        VALUES (?, ?)
     `)
 
-    const result = stmt.run(name)
+    const result = stmt.run(name, role)
 
     return {
         id: result.lastInsertRowid,
         name,
+        role,
     }
 }
 

@@ -3,9 +3,9 @@ import { create, get, list } from "../services/employeeService"
 
 export const createEmployee = (req: Request, res: Response) => {
     try {
-        const { name } = req.body
+        const { name, role } = req.body
 
-        const employee = create(name)
+        const employee = create(name, role)
 
         res.status(201).json(employee)
     } catch (error: any) {
