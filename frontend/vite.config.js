@@ -8,7 +8,8 @@ export default defineConfig({
     proxy: {
       '/command': 'http://localhost:3000',
       '/employees': 'http://localhost:3000',
-      '/shifts': 'http://localhost:3000'
+      '/shifts': 'http://localhost:3000',
+      '/schedule': 'http://localhost:3000'
     }
   }
 })

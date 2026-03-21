@@ -1,3 +1,4 @@
+import { useRef, useEffect } from "react";
 import Message from "./Message";
 import Suggestions from "./Suggestions";
 
@@ -8,8 +9,18 @@ export default function Chat({
     handleSend,
     suggestions,
 }) {
+    const messagesEndRef = useRef(null);
+
+    const scrollToBottom = () => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    };
+
+    useEffect(() => {
+        scrollToBottom();
+    }, [messages]);
+
     return (
-        <div className="w-full md:w-1/3 border-t md:border-t-0 md:border-l border-gray-100 bg-white flex flex-col h-full overflow-hidden">
+        <div className="w-full md:w-[320px] lg:w-[380px] shrink-0 border-t md:border-t-0 md:border-l border-gray-100 bg-white flex flex-col h-full overflow-hidden">
             <div className="p-5 md:p-6 border-b border-gray-100 flex items-center justify-between">
                 <span className="font-medium text-base md:text-lg">
                     Command Center
@@ -22,6 +33,7 @@ export default function Chat({
                 {messages.map((msg, i) => (
                     <Message key={i} msg={msg} />
                 ))}
+                <div ref={messagesEndRef} />
             </div>
 
             {/* suggestions */}

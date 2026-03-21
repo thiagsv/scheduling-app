@@ -1,29 +1,29 @@
 import { useState, useEffect } from "react";
+import EmployeeDirectory from "./components/EmployeeDirectory";
 import Schedule from "./components/Schedule";
 import Chat from "./components/Chat";
 
 export default function App() {
     const [messages, setMessages] = useState([]);
     const [input, setInput] = useState("");
-
-    const [schedule] = useState({
-        Saturday: {
-            Cook: ["John", "Mary"],
-            Waiter: ["Peter", "Ann"],
-            Manager: ["Luke"],
-        },
-        Sunday: {
-            Cook: ["Charles"],
-            Waiter: ["Fernanda"],
-            Manager: [],
-        },
-    });
+    const [schedule, setSchedule] = useState({});
+    const [employees, setEmployees] = useState([]);
 
     useEffect(() => {
+        // Fetch employees
         fetch("/employees")
             .then((res) => res.json())
-            .then((data) => console.log("Backend connection successful:", data))
-            .catch((err) => console.error("Backend connection error:", err));
+            .then((data) => setEmployees(data))
+            .catch((err) => console.error("Error fetching employees:", err));
+
+        // Fetch initial schedule from database
+        fetch("/schedule")
+            .then((res) => res.json())
+            .then((data) => {
+                setSchedule(data);
+                console.log("Schedule loaded:", data);
+            })
+            .catch((err) => console.error("Error fetching schedule:", err));
     }, []);
 
     const suggestions = [
@@ -63,12 +63,16 @@ export default function App() {
                 return;
             }
 
+            // Update schedule dynamically from backend response
+            if (data.schedule) {
+                setSchedule(data.schedule);
+            }
+
             setMessages((prev) => [
                 ...prev,
                 { 
                     text: `Command interpreted: ${data.intent.replace(/_/g, ' ')}`, 
                     role: "ai",
-                    data: data // Store data for future UI updates
                 },
             ]);
         } catch (err) {
@@ -82,8 +86,9 @@ export default function App() {
     };
 
     return (
-        <div className="h-screen w-full flex justify-center items-center bg-[#F7F7F8] text-gray-900 font-sans">
-            <div className="w-full max-w-[1400px] flex flex-col md:flex-row h-[85vh] min-h-[640px] max-h-[900px]">
+        <div className="h-screen w-full flex justify-center items-center bg-[#F7F7F8] text-gray-900 font-sans p-4">
+            <div className="w-full max-w-[1500px] flex flex-col md:flex-row h-[85vh] min-h-[640px] max-h-[900px] bg-white shadow-sm rounded-xl overflow-hidden border border-gray-200">
+                <EmployeeDirectory employees={employees} />
                 <Schedule schedule={schedule} />
                 <Chat 
                     messages={messages} 

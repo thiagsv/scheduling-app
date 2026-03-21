@@ -1,7 +1,10 @@
 export type Command =
     | { intent: "create_schedule"; day: string; roles: { role: string; count: number }[] }
     | { intent: "fill_schedule"; day: string }
-    | { intent: "swap"; from: string; to: string; day?: string };
+    | { intent: "swap"; from: string; to: string; day?: string }
+    | { intent: "assign"; employee: string; day: string }
+    | { intent: "create_employee"; name: string; role: string }
+    | { intent: "update_employee"; name: string; role: string };
 
 export type ErrorResponse = {
     type: "error";
@@ -12,6 +15,8 @@ const INTENTS = [
     { name: "create_schedule", keywords: ["create", "schedule", "shift"] },
     { name: "fill_schedule", keywords: ["fill", "complete", "schedule"] },
     { name: "swap", keywords: ["swap", "replace", "change"] },
+    { name: "create_employee", keywords: ["create", "add", "new", "hire", "employee", "worker", "user"] },
+    { name: "update_employee", keywords: ["update", "edit", "change", "employee", "role"] }
 ] as const;
 
 type IntentName = (typeof INTENTS)[number]["name"];
@@ -25,6 +30,38 @@ function normalize(input: string): string[] {
         .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, "")
         .trim()
         .split(/\s+/);
+}
+
+function getLevenshteinDistance(a: string, b: string): number {
+    const matrix = [];
+    for (let i = 0; i <= a.length; i++) matrix[i] = [i];
+    for (let j = 0; j <= b.length; j++) matrix[0][j] = j;
+    for (let i = 1; i <= a.length; i++) {
+        for (let j = 1; j <= b.length; j++) {
+            if (a[i - 1] === b[j - 1]) matrix[i][j] = matrix[i - 1][j - 1];
+            else matrix[i][j] = Math.min(matrix[i - 1][j - 1], matrix[i][j - 1], matrix[i - 1][j]) + 1;
+        }
+    }
+    return matrix[a.length][b.length];
+}
+
+function findBestMatch(word: string, candidates: string[], maxDist = 2): string | null {
+    const allowedDist = word.length <= 3 ? 0 : maxDist;
+    for (const c of candidates) {
+        if (getLevenshteinDistance(word, c) <= allowedDist) return c;
+    }
+    return null;
+}
+
+import { db } from "../db/database";
+
+function getEmployeeNames(): string[] {
+    try {
+        const emps = db.prepare("SELECT name FROM employees").all() as any[];
+        return emps.map(e => e.name.toLowerCase());
+    } catch {
+        return [];
+    }
 }
 
 function detectIntent(words: string[]): IntentName | null {
@@ -59,7 +96,11 @@ function extractEntities(intent: IntentName, words: string[]): Command | ErrorRe
 
     switch (intent) {
         case "create_schedule": {
-            const day = words.find((w) => DAYS.includes(w));
+            let day = words.find((w) => DAYS.includes(w));
+            if (!day) {
+                const fuzzyDay = words.find(w => findBestMatch(w, DAYS, 2));
+                day = fuzzyDay ? findBestMatch(fuzzyDay, DAYS, 2) || undefined : undefined;
+            }
             if (!day) return defaultError;
 
             const roles: { role: string; count: number }[] = [];
@@ -69,14 +110,30 @@ function extractEntities(intent: IntentName, words: string[]): Command | ErrorRe
 
                 const count = parseInt(word, 10);
                 if (!isNaN(count) && nextWord) {
-                    const normalizedRole = ROLES.find((r) => nextWord.startsWith(r));
+                    const normalizedRole = ROLES.find((r) => nextWord.startsWith(r)) 
+                                        || findBestMatch(nextWord, ROLES, 2);
                     if (normalizedRole) {
                         roles.push({ role: normalizedRole, count });
                     }
                 }
             }
 
-            if (roles.length === 0) return defaultError;
+            if (roles.length === 0) {
+                // Handle "create schedule saturday with jhon"
+                const empNames = getEmployeeNames();
+                let foundEmp = null;
+                for (const w of words) {
+                    foundEmp = findBestMatch(w, empNames, 2);
+                    if (foundEmp) break;
+                }
+                
+                if (foundEmp) {
+                    return { intent: "assign", employee: foundEmp, day };
+                }
+                
+                return defaultError;
+            }
+            
             return { intent: "create_schedule", day, roles };
         }
 

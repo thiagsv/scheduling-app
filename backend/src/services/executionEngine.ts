@@ -1,0 +1,68 @@
+import { db } from "../db/database";
+import { Command } from "./parseCommand";
+import { getSchedule } from "./scheduleService";
+
+export const executeCommand = (command: Command) => {
+    switch (command.intent) {
+        case "create_schedule": {
+            db.prepare(`DELETE FROM shifts WHERE day = ?`).run(command.day);
+            const insert = db.prepare(`INSERT INTO shifts (day, role, employee_id) VALUES (?, ?, NULL)`);
+            for (const r of command.roles) {
+                for (let i = 0; i < r.count; i++) {
+                    insert.run(command.day, r.role);
+                }
+            }
+            break;
+        }
+        case "assign": {
+            const emp = db.prepare(`SELECT * FROM employees WHERE name = ? COLLATE NOCASE`).get(command.employee) as any;
+            if (!emp) throw new Error("Employee not found for assignment");
+            
+            // Try to fill an existing empty slot
+            const emptySlot = db.prepare(`SELECT id FROM shifts WHERE day = ? AND role = ? AND employee_id IS NULL LIMIT 1`).get(command.day, emp.role) as any;
+            
+            if (emptySlot) {
+                db.prepare(`UPDATE shifts SET employee_id = ? WHERE id = ?`).run(emp.id, emptySlot.id);
+            } else {
+                // Or create a new slot specifically forced for them
+                db.prepare(`INSERT INTO shifts (day, role, employee_id) VALUES (?, ?, ?)`).run(command.day, emp.role, emp.id);
+            }
+            break;
+        }
+        case "fill_schedule": {
+            const emptySlots = db.prepare(`SELECT * FROM shifts WHERE day = ? AND employee_id IS NULL`).all(command.day) as any[];
+            const assign = db.prepare(`UPDATE shifts SET employee_id = ? WHERE id = ?`);
+
+            for (const slot of emptySlots) {
+                const availableEmployee = db.prepare(`
+                    SELECT id FROM employees 
+                    WHERE role = ? 
+                    AND id NOT IN (SELECT employee_id FROM shifts WHERE day = ? AND employee_id IS NOT NULL)
+                    LIMIT 1
+                `).get(slot.role, command.day) as any;
+
+                if (availableEmployee) {
+                    assign.run(availableEmployee.id, slot.id);
+                }
+            }
+            break;
+        }
+        case "swap": {
+            const fromEmp = db.prepare(`SELECT id FROM employees WHERE name = ? COLLATE NOCASE`).get(command.from) as any;
+            const toEmp = db.prepare(`SELECT id, role FROM employees WHERE name = ? COLLATE NOCASE`).get(command.to) as any;
+
+            if (!fromEmp || !toEmp) {
+                throw new Error("Colaboradores não encontrados no banco.");
+            }
+
+            if (command.day) {
+                db.prepare(`UPDATE shifts SET employee_id = ? WHERE employee_id = ? AND day = ?`).run(toEmp.id, fromEmp.id, command.day);
+            } else {
+                db.prepare(`UPDATE shifts SET employee_id = ? WHERE employee_id = ?`).run(toEmp.id, fromEmp.id);
+            }
+            break;
+        }
+    }
+
+    return getSchedule();
+};

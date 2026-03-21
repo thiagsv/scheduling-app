@@ -2,34 +2,30 @@ import { db } from "../db/database"
 
 export interface Shift {
     id: number
-    start_time: string
-    end_time: string
+    day: string
+    role: string
     employee_id: number | null
     employee_name?: string
 }
 
-export const create = (startTime: string, endTime: string, employeeId?: number | null) => {
-    const stmt = db.prepare(`
-        INSERT INTO shifts (start_time, end_time, employee_id)
-        VALUES (?, ?, ?)
-    `)
-
-    const result = stmt.run(startTime, endTime, employeeId ?? null)
-
-    return {
-        id: result.lastInsertRowid as number,
-        startTime,
-        endTime,
-        employeeId: employeeId ?? null,
-    }
+export const clearDay = (day: string) => {
+    const stmt = db.prepare(`DELETE FROM shifts WHERE day = ?`)
+    return stmt.run(day)
 }
 
-export const findByEmployeeId = (employeeId: number): Shift[] => {
+export const createEmptySlot = (day: string, role: string) => {
     const stmt = db.prepare(`
-        SELECT * FROM shifts WHERE employee_id = ?
+        INSERT INTO shifts (day, role, employee_id)
+        VALUES (?, ?, NULL)
     `)
+    return stmt.run(day, role)
+}
 
-    return stmt.all(employeeId) as Shift[]
+export const assignShift = (shiftId: number, employeeId: number | null) => {
+    const stmt = db.prepare(`
+        UPDATE shifts SET employee_id = ? WHERE id = ?
+    `)
+    return stmt.run(employeeId, shiftId)
 }
 
 export const listAll = (): Shift[] => {
@@ -38,6 +34,5 @@ export const listAll = (): Shift[] => {
         FROM shifts s
         LEFT JOIN employees e ON s.employee_id = e.id
     `)
-
     return stmt.all() as Shift[]
 }

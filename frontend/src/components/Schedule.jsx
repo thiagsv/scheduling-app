@@ -1,7 +1,7 @@
 export default function Schedule({ schedule }) {
     return (
-        <div className="w-full md:w-2/3 p-6 md:p-10 overflow-y-auto overscroll-contain h-full [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full">
-            <div className="flex items-center justify-between mb-8 md:mb-10 sticky top-0 bg-[#F7F7F8] z-10 pb-2">
+        <div className="w-full md:flex-1 bg-white overflow-y-auto overscroll-contain h-full [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full">
+            <div className="flex items-center justify-between sticky top-0 bg-white z-10 px-6 md:px-10 py-6 md:py-8 border-b border-gray-100 shadow-sm">
                 <h1 className="text-2xl md:text-3xl font-semibold tracking-tight">
                     Workforce Schedule
                 </h1>
@@ -10,7 +10,8 @@ export default function Schedule({ schedule }) {
                 </div>
             </div>
 
-            {Object.entries(schedule).map(([day, roles]) => (
+            <div className="p-6 md:p-10 pt-4 md:pt-6">
+                {Object.entries(schedule).map(([day, roles]) => (
                 <div key={day} className="mb-10 md:mb-12">
                     <h2 className="text-sm md:text-base uppercase tracking-wider text-gray-400 mb-4 md:mb-5">
                         {day}
@@ -32,21 +33,24 @@ export default function Schedule({ schedule }) {
                                 </div>
 
                                 <div className="space-y-2 md:space-y-3">
-                                    {people.map((person, i) => (
+                                    {people.map((person, i) => {
+                                        const isEmpty = person === "Empty Slot";
+                                        return (
                                         <div
                                             key={i}
-                                            className="flex items-center gap-2 md:gap-3 text-sm md:text-base"
+                                            className={`flex items-center gap-2 md:gap-3 text-sm md:text-base ${isEmpty ? 'text-gray-400 opacity-80' : ''}`}
                                         >
-                                            <div className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-gray-200 flex items-center justify-center text-xs md:text-sm font-medium">
-                                                {person[0]}
+                                            <div className={`w-7 h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center text-xs md:text-sm font-medium ${isEmpty ? 'bg-transparent border border-gray-300 border-dashed' : 'bg-gray-200'}`}>
+                                                {isEmpty ? "?" : person[0]}
                                             </div>
                                             {person}
                                         </div>
-                                    ))}
+                                        );
+                                    })}
 
                                     {people.length === 0 && (
                                         <div className="text-xs md:text-sm text-gray-400">
-                                            No one assigned
+                                            No schedule rules set
                                         </div>
                                     )}
                                 </div>
@@ -55,6 +59,7 @@ export default function Schedule({ schedule }) {
                     </div>
                 </div>
             ))}
+            </div>
         </div>
     );
 }
