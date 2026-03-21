@@ -70,7 +70,14 @@ export const executeCommand = (command: Command) => {
         case "update_employee": {
             const emp = db.prepare(`SELECT * FROM employees WHERE name = ? COLLATE NOCASE`).get(command.name) as any;
             if (!emp) throw new Error("Employee not found");
-            db.prepare(`UPDATE employees SET role = ? WHERE id = ?`).run(command.role, emp.id);
+            
+            if (command.newRole) {
+                db.prepare(`UPDATE employees SET role = ? WHERE id = ?`).run(command.newRole, emp.id);
+            }
+            if (command.newName) {
+                const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.substring(1);
+                db.prepare(`UPDATE employees SET name = ? WHERE id = ?`).run(capitalize(command.newName), emp.id);
+            }
             break;
         }
     }

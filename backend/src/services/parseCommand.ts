@@ -4,7 +4,7 @@ export type Command =
     | { intent: "swap"; from: string; to: string; day?: string }
     | { intent: "assign"; employee: string; day: string }
     | { intent: "create_employee"; name: string; role: string }
-    | { intent: "update_employee"; name: string; role: string };
+    | { intent: "update_employee"; name: string; newName?: string; newRole?: string };
 
 export type ErrorResponse = {
     type: "error";
@@ -16,7 +16,7 @@ const INTENTS = [
     { name: "fill_schedule", keywords: ["fill", "complete", "schedule"] },
     { name: "swap", keywords: ["swap", "replace", "change"] },
     { name: "create_employee", keywords: ["create", "add", "new", "hire", "employee", "worker", "user"] },
-    { name: "update_employee", keywords: ["update", "edit", "change", "employee", "role"] }
+    { name: "update_employee", keywords: ["update", "edit", "change", "employee", "role", "name"] }
 ] as const;
 
 type IntentName = (typeof INTENTS)[number]["name"];
@@ -68,6 +68,8 @@ function detectIntent(words: string[]): IntentName | null {
     let bestIntent: IntentName | null = null;
     let bestScore = 0;
 
+    const empNames = getEmployeeNames();
+
     for (const intent of INTENTS) {
         let score = 0;
         for (const keyword of intent.keywords) {
@@ -75,13 +77,21 @@ function detectIntent(words: string[]): IntentName | null {
                 score++;
             }
         }
+        
+        // Context boosters
+        for (const word of words) {
+            if (DAYS.includes(word) || ROLES.includes(word) || findBestMatch(word, empNames, 1)) {
+                score += 0.5;
+            }
+        }
+
         if (score > bestScore) {
             bestScore = score;
             bestIntent = intent.name;
         }
     }
 
-    if (bestScore < 2) {
+    if (bestScore < 1.5) {
         return null;
     }
 
@@ -191,28 +201,53 @@ function extractEntities(intent: IntentName, words: string[]): Command | ErrorRe
             return { intent: "create_employee", name: finalName, role: finalRole };
         }
         case "update_employee": {
-            let finalRole: string | undefined;
+            const empNames = getEmployeeNames();
+            let currentName: string | undefined;
+            let nameIdx = -1;
+
+            // Find current employee name
+            for (let i = 0; i < words.length; i++) {
+                const match = findBestMatch(words[i], empNames, 1);
+                if (match) {
+                    currentName = match;
+                    nameIdx = i;
+                    break;
+                }
+            }
+            if (!currentName) return defaultError;
+
+            let newRole: string | undefined;
+            let newName: string | undefined;
+
+            // Detection of what to update
+            const hasNameKeyword = words.includes("name");
+
+            // Look for new role
             for (let i = words.length - 1; i >= 0; i--) {
+                if (i === nameIdx) continue; 
                 const match = findBestMatch(words[i], ROLES, 1);
                 if (match) {
-                    finalRole = match;
+                    newRole = match;
                     break;
                 }
             }
-            if (!finalRole) return defaultError;
 
-            const empNames = getEmployeeNames();
-            let finalName: string | undefined;
-            for (const w of words) {
-                const match = findBestMatch(w, empNames, 1);
-                if (match) {
-                    finalName = match;
-                    break;
+            // Look for new name (improved search)
+            if (hasNameKeyword || words.includes("to")) {
+                const toIdx = words.lastIndexOf("to");
+                if (toIdx !== -1 && toIdx > nameIdx && words[toIdx + 1]) {
+                    const candidateName = words[toIdx + 1];
+                    // If candidate name is actually a role, ignore it as a name unless 'name' keyword was explicit
+                    const isRole = findBestMatch(candidateName, ROLES, 1);
+                    if (!isRole || hasNameKeyword) {
+                        newName = candidateName;
+                    }
                 }
             }
-            if (!finalName) return defaultError;
 
-            return { intent: "update_employee", name: finalName, role: finalRole };
+            if (!newRole && !newName) return defaultError;
+
+            return { intent: "update_employee", name: currentName, newName, newRole };
         }
         default:
             return defaultError;
