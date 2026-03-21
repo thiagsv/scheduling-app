@@ -55,8 +55,13 @@ function extractEntities(intent: IntentName, words: string[]): Command | ErrorRe
 
             const roles: { role: string; count: number }[] = [];
             for (let i = 0; i < words.length; i++) {
-                const count = parseInt(words[i], 10);
-                if (!isNaN(count) && words[i + 1]) {
+                let count = parseInt(words[i], 10);
+                if (isNaN(count)) {
+                    if (words[i] === "a" || words[i] === "an") count = 1;
+                    else continue;
+                }
+
+                if (words[i + 1]) {
                     const role = ROLES.find(r => words[i+1].startsWith(r)) || findBestMatch(words[i+1], ROLES, 2);
                     if (role) roles.push({ role, count });
                 }
