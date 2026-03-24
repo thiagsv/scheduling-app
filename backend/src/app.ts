@@ -3,6 +3,18 @@ import employeeRoutes from "./routes/employeeRoutes"
 import commandRoutes from "./routes/commandRoutes"
 import scheduleRoutes from "./routes/scheduleRoutes"
 import "./db/database"
+import { configureIntentLlmClient } from "./services/intentInterpreter"
+import { GeminiIntentClient } from "./services/geminiIntentClient"
+
+const geminiApiKey = process.env.GEMINI_API_KEY?.trim()
+if (geminiApiKey) {
+    configureIntentLlmClient(
+        new GeminiIntentClient(
+            geminiApiKey,
+            process.env.GEMINI_MODEL?.trim() || "gemini-2.5-flash",
+        ),
+    )
+}
 
 const app = express()
 app.use(express.json())

@@ -16,7 +16,7 @@ type StandardLlmResponse = {
 export type IntentLlmRequest = {
     systemPrompt: string;
     userPrompt: string;
-    responseExample: string;
+    responseSchema: Record<string, unknown>;
 };
 
 export interface IntentLlmClient {
@@ -35,6 +35,24 @@ const STANDARD_LLM_RESPONSE_EXAMPLE = JSON.stringify(
     null,
     2,
 );
+
+const STANDARD_LLM_RESPONSE_SCHEMA = {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+        command: {
+            type: ["object", "null"],
+            description:
+                "A scheduling command object using full English field values, or null when the request is ambiguous.",
+        },
+        reason: {
+            type: ["string", "null"],
+            description:
+                "A short explanation when command is null. Use null when a valid command is returned.",
+        },
+    },
+    required: ["command", "reason"],
+} as const;
 
 let llmClient: IntentLlmClient | null = null;
 
@@ -83,7 +101,7 @@ function buildLlmRequest(
             `User request: ${input.trim()}.`,
             "If the request is ambiguous or incomplete, return {\"command\": null, \"reason\": \"short explanation\"}.",
         ].join("\n\n"),
-        responseExample: STANDARD_LLM_RESPONSE_EXAMPLE,
+        responseSchema: STANDARD_LLM_RESPONSE_SCHEMA,
     };
 }
 
