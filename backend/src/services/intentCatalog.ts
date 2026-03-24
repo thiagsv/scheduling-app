@@ -93,7 +93,7 @@ export const INTENT_CATALOG: IntentDefinition[] = [
     {
         name: "fill_schedule",
         description: "Automatically fills open schedule slots, optionally filtered by day or role.",
-        keywords: ["fill", "complete", "autofill", "populate"],
+        keywords: ["fill", "complete", "autofill", "populate", "schedule"],
         requiredParameters: [],
         optionalParameters: [
             {

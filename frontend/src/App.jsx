@@ -42,9 +42,9 @@ export default function App() {
         "Fill schedule Saturday",
         "Complete schedule Sunday",
         "Assign Maria to Sunday",
-        "Swap John with Jane on Saturday",
+        "Assign Jane to Monday",
         "Create employee Lucas as waiter",
-        "Update Maria to manager",
+        "Update Alice to manager",
     ];
 
     const handleSend = async () => {
