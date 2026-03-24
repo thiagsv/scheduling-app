@@ -7,6 +7,7 @@ const engine = new ScheduleEngine();
 export const executeCommand = (command: Command) => {
     switch (command.intent) {
         case "create_schedule": {
+            // Rebuild the requested day from scratch so the new role counts become the single source of truth.
             db.prepare(`DELETE FROM shifts WHERE day = ?`).run(command.day);
             const insert = db.prepare(`INSERT INTO shifts (day, role, employee_id) VALUES (?, ?, NULL)`);
             for (const r of command.roles) {

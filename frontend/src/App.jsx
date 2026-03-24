@@ -3,6 +3,17 @@ import EmployeeDirectory from "./components/EmployeeDirectory";
 import Schedule from "./components/Schedule";
 import Chat from "./components/Chat";
 
+function formatSourceLabel(source) {
+    switch (source) {
+        case "llm":
+            return "LLM";
+        case "parser":
+            return "parser fallback";
+        default:
+            return "unknown source";
+    }
+}
+
 export default function App() {
     const [messages, setMessages] = useState([]);
     const [input, setInput] = useState("");
@@ -30,8 +41,10 @@ export default function App() {
         "Create schedule Sunday with 1 manager and 3 waiters",
         "Fill schedule Saturday",
         "Complete schedule Sunday",
-        "Swap employee1 with employee2 on Saturday",
-        "Replace worker in Sunday schedule",
+        "Assign Maria to Sunday",
+        "Swap John with Jane on Saturday",
+        "Create employee Lucas as waiter",
+        "Update Maria to manager",
     ];
 
     const handleSend = async () => {
@@ -68,7 +81,7 @@ export default function App() {
             setMessages((prev) => [
                 ...prev,
                 { 
-                    text: `Command interpreted: ${data.intent.replace(/_/g, ' ')}`, 
+                    text: `Command interpreted: ${data.intent.replace(/_/g, ' ')} via ${formatSourceLabel(data.source)}`,
                     role: "ai",
                 },
             ]);

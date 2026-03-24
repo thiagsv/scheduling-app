@@ -1,34 +1,48 @@
 import { Request, Response } from "express";
-import { parseCommand } from "../services/parseCommand";
 import { executeCommand } from "../services/executionEngine";
+import { interpretCommand } from "../services/intentInterpreter";
+import { ErrorResponse } from "../types";
 
-export const handleCommand = (req: Request, res: Response) => {
+function isErrorResponse(value: ErrorResponse | unknown): value is ErrorResponse {
+    return typeof value === "object" && value !== null && "type" in value && value.type === "error";
+}
+
+function describeSource(source: "llm" | "parser"): string {
+    switch (source) {
+        case "llm":
+            return "LLM";
+        case "parser":
+            return "parser fallback";
+    }
+}
+
+export const handleCommand = async (req: Request, res: Response) => {
     try {
         const { command } = req.body;
 
-        if (!command) {
+        if (typeof command !== "string" || !command.trim()) {
             res.status(400).json({ type: "error", message: "command is required in the body" });
             return;
         }
 
-        const parsedResult = parseCommand(command);
+        const interpretation = await interpretCommand(command);
 
-        if ("type" in parsedResult && parsedResult.type === "error") {
-            res.status(400).json(parsedResult);
+        if (isErrorResponse(interpretation)) {
+            res.status(400).json(interpretation);
             return;
         }
 
-        const validCommand = parsedResult as any;
-
-        // Action the command in the database
-        const result = executeCommand(validCommand);
+        executeCommand(interpretation.command);
 
         res.status(200).json({
-            intent: validCommand.intent,
-            message: `Command executed: ${validCommand.intent}`
+            intent: interpretation.command.intent,
+            command: interpretation.command,
+            source: interpretation.source,
+            message: `Command executed: ${interpretation.command.intent} via ${describeSource(interpretation.source)}`
         });
 
-    } catch (error: any) {
-        res.status(500).json({ type: "error", message: error.message });
+    } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : "Unexpected server error";
+        res.status(500).json({ type: "error", message });
     }
 };

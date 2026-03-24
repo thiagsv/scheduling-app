@@ -1,33 +1,42 @@
-import { Command, ErrorResponse } from "../types";
+import { Command, Day, ErrorResponse, IntentName, RoleCount } from "../types";
+import { INTENT_CATALOG } from "./intentCatalog";
 import {
-    DAYS,
-    ROLES,
-    INTENTS,
-    IntentName,
-    normalize,
     findBestMatch,
-    getEmployeeNames
+    findDay,
+    findRole,
+    getEmployeeNames,
+    normalize,
+    resolveEmployeeName,
 } from "./nluUtils";
 
-const defaultError: ErrorResponse = {
+const missingInfoError: ErrorResponse = {
     type: "error",
-    message: "I understood what you tried to do, but some information is missing (like name, role, or day). Can you rewrite it?"
+    message:
+        "I understood the intent, but some information is missing. Try including the employee, role, or day.",
+};
+
+const fallbackMessage: ErrorResponse = {
+    type: "error",
+    message:
+        "I didn’t understand that. Try: 'create schedule saturday 2 cooks'.",
 };
 
 function detectIntent(words: string[]): IntentName | null {
     let bestIntent: IntentName | null = null;
     let bestScore = 0;
+    const employeeNames = getEmployeeNames();
 
-    const empNames = getEmployeeNames();
-
-    for (const intent of INTENTS) {
+    for (const intent of INTENT_CATALOG) {
         let score = 0;
+
         for (const keyword of intent.keywords) {
-            if (words.includes(keyword)) score++;
+            if (words.includes(keyword)) {
+                score += 1;
+            }
         }
 
         for (const word of words) {
-            if (DAYS.includes(word) || ROLES.includes(word) || findBestMatch(word, empNames, 1)) {
+            if (findDay(word) || findRole(word) || findBestMatch(word, employeeNames, 1)) {
                 score += 0.5;
             }
         }
@@ -41,111 +50,236 @@ function detectIntent(words: string[]): IntentName | null {
     return bestScore >= 1.5 ? bestIntent : null;
 }
 
-function extractEntities(intent: IntentName, words: string[]): Command | ErrorResponse {
-    const missingInfoError: ErrorResponse = { type: "error", message: "Missing required information" };
-    const empNames = getEmployeeNames();
+function findNormalizedDay(words: string[]): Day | undefined {
+    for (const word of words) {
+        const day = findDay(word);
+        if (day) {
+            return day;
+        }
+    }
 
-    // Helper to find day
-    const day = words.find(w => DAYS.includes(w)) || words.find(w => findBestMatch(w, DAYS, 2));
-    const normalizedDay = day ? (DAYS.includes(day) ? day : findBestMatch(day, DAYS, 2)) : undefined;
+    return undefined;
+}
+
+function collectEmployeeMentions(words: string[]): string[] {
+    const matches = new Map<string, string>();
+
+    for (let i = 0; i < words.length; i++) {
+        const candidates = [words[i]];
+        if (words[i + 1]) {
+            candidates.push(`${words[i]} ${words[i + 1]}`);
+        }
+
+        for (const candidate of candidates) {
+            const resolved = resolveEmployeeName(candidate, candidate.includes(" ") ? 3 : 2);
+            if (resolved) {
+                matches.set(resolved.toLowerCase(), resolved);
+            }
+        }
+    }
+
+    return [...matches.values()];
+}
+
+function findFirstEmployee(words: string[], excluded: string[] = []): string | undefined {
+    const excludedSet = new Set(excluded.map((name) => name.toLowerCase()));
+    return collectEmployeeMentions(words).find(
+        (employee) => !excludedSet.has(employee.toLowerCase()),
+    );
+}
+
+function extractRoleCounts(words: string[]): RoleCount[] {
+    const roles: RoleCount[] = [];
+
+    for (let index = 0; index < words.length; index++) {
+        const count = /^\d+$/.test(words[index]) ? Number(words[index]) : undefined;
+        if (!count || !words[index + 1]) {
+            continue;
+        }
+
+        const role = findRole(words[index + 1]);
+        if (!role) {
+            continue;
+        }
+
+        roles.push({ role, count });
+    }
+
+    return roles;
+}
+
+function extractCreateEmployeeName(words: string[]): string | undefined {
+    const markerIdx = words.findIndex((word) =>
+        ["called", "named"].includes(word),
+    );
+
+    if (markerIdx !== -1 && words[markerIdx + 1] && !findRole(words[markerIdx + 1])) {
+        return words[markerIdx + 1];
+    }
+
+    const stopwords = new Set([
+        "create",
+        "add",
+        "new",
+        "hire",
+        "employee",
+        "worker",
+        "user",
+        "as",
+        "a",
+        "an",
+        "the",
+        "with",
+        "role",
+    ]);
+
+    return words.find((word) => !stopwords.has(word) && !findRole(word));
+}
+
+function extractNewName(words: string[]): string | undefined {
+    for (let index = 0; index < words.length; index++) {
+        const word = words[index];
+        const nextWord = words[index + 1];
+
+        if (!nextWord) {
+            continue;
+        }
+
+        if (word === "to") {
+            if (!findRole(nextWord) || words.includes("name")) {
+                return nextWord;
+            }
+        }
+    }
+
+    return undefined;
+}
+
+function extractEntities(intent: IntentName, words: string[]): Command | ErrorResponse {
+    const normalizedDay = findNormalizedDay(words);
 
     switch (intent) {
         case "create_schedule": {
-            if (!normalizedDay) return missingInfoError;
-
-            const roles: { role: string; count: number }[] = [];
-            for (let i = 0; i < words.length; i++) {
-                let count = parseInt(words[i], 10);
-                if (isNaN(count)) {
-                    if (words[i] === "a" || words[i] === "an") count = 1;
-                    else continue;
-                }
-
-                if (words[i + 1]) {
-                    const role = ROLES.find(r => words[i + 1].startsWith(r)) || findBestMatch(words[i + 1], ROLES, 2);
-                    if (role) roles.push({ role, count });
-                }
-            }
-
-            if (roles.length === 0) {
-                const foundEmp = words.map(w => findBestMatch(w, empNames, 2)).find(match => match);
-                if (foundEmp) return { intent: "assign", employee: foundEmp, day: normalizedDay };
+            if (!normalizedDay) {
                 return missingInfoError;
             }
+
+            const roles = extractRoleCounts(words);
+            if (roles.length === 0) {
+                const employee = findFirstEmployee(words);
+                return employee
+                    ? { intent: "assign", employee, day: normalizedDay }
+                    : missingInfoError;
+            }
+
             return { intent: "create_schedule", day: normalizedDay, roles };
         }
 
         case "assign": {
-            const finalName = words.map(w => findBestMatch(w, empNames, 1)).find(m => m);
-            if (!finalName || !normalizedDay) return missingInfoError;
-            return { intent: "assign", employee: finalName, day: normalizedDay };
+            const employee = findFirstEmployee(words);
+            if (!employee || !normalizedDay) {
+                return missingInfoError;
+            }
+
+            return { intent: "assign", employee, day: normalizedDay };
         }
 
         case "fill_schedule": {
-            const foundEmp = words.map(w => findBestMatch(w, empNames, 2)).find(match => match);
-            if (foundEmp) return { intent: "assign", employee: foundEmp, day: normalizedDay };
+            const employee = findFirstEmployee(words);
+            if (employee) {
+                const command: Command = { intent: "assign", employee };
+                if (normalizedDay) {
+                    command.day = normalizedDay;
+                }
+                return command;
+            }
 
-            const foundRole = words.map(w => findBestMatch(w, ROLES, 1)).find(match => match);
-            return { intent: "fill_schedule", day: normalizedDay, role: foundRole };
+            const role = words.map((word) => findRole(word)).find((value) => value);
+            const command: Command = { intent: "fill_schedule" };
+
+            if (normalizedDay) {
+                command.day = normalizedDay;
+            }
+
+            if (role) {
+                command.role = role;
+            }
+
+            return command;
         }
 
         case "swap": {
-            const swapKeywords = ["swap", "replace", "change", "switch"];
-            const actionIdx = words.findIndex(w => swapKeywords.includes(w));
+            const employees = collectEmployeeMentions(words);
+            const from = employees[0];
+            const to = employees.find((employee) => employee.toLowerCase() !== from?.toLowerCase());
 
-            let from = actionIdx !== -1 && words[actionIdx + 1] ? findBestMatch(words[actionIdx + 1], empNames, 2) || words[actionIdx + 1] : undefined;
+            if (!from || !to) {
+                return missingInfoError;
+            }
 
-            const withIdx = words.findIndex(w => ["with", "for", "in", "on", "and", "by"].includes(w));
-            let to = withIdx !== -1 && words[withIdx + 1] ? findBestMatch(words[withIdx + 1], empNames, 2) || words[withIdx + 1] : undefined;
-            if (!to && actionIdx !== -1) to = findBestMatch(words[actionIdx + 2], empNames, 2) || words[actionIdx + 2];
-
-            if (!from || !to) return missingInfoError;
-            return { intent: "swap", from, to, day: normalizedDay };
+            const command: Command = { intent: "swap", from, to };
+            if (normalizedDay) {
+                command.day = normalizedDay;
+            }
+            return command;
         }
 
         case "create_employee": {
-            const finalRole = words.slice().reverse().map(w => findBestMatch(w, ROLES, 1)).find(m => m);
-            const stopwords = ["create", "add", "new", "hire", "employee", "worker", "user", "as", "a", "an", "the", "with", "role"];
-            const finalName = words.find(w => !stopwords.includes(w) && !findBestMatch(w, ROLES, 1));
+            const role = words
+                .slice()
+                .reverse()
+                .map((word) => findRole(word))
+                .find((value) => value);
+            const name = extractCreateEmployeeName(words);
 
-            if (!finalRole || !finalName) return missingInfoError;
-            return { intent: "create_employee", name: finalName, role: finalRole };
+            if (!role || !name) {
+                return missingInfoError;
+            }
+
+            return { intent: "create_employee", name, role };
         }
 
         case "update_employee": {
-            let currentName = words.map(w => findBestMatch(w, empNames, 1)).find(m => m);
-            if (!currentName) return missingInfoError;
-
-            const nameIdx = words.indexOf(currentName);
-            const newRole = words.filter((_, i) => i !== nameIdx).map(w => findBestMatch(w, ROLES, 1)).find(m => m);
-
-            let newName: string | undefined;
-            const toIdx = words.lastIndexOf("to");
-            if (toIdx !== -1 && toIdx > nameIdx && words[toIdx + 1]) {
-                if (!findBestMatch(words[toIdx + 1], ROLES, 1) || words.includes("name")) {
-                    newName = words[toIdx + 1];
-                }
+            const currentName = findFirstEmployee(words);
+            if (!currentName) {
+                return missingInfoError;
             }
 
-            if (!newRole && !newName) return missingInfoError;
-            return { intent: "update_employee", name: currentName, newName, newRole };
+            const newRole = words
+                .map((word) => findRole(word))
+                .find((role) => role);
+            const newName = extractNewName(words);
+
+            if (!newRole && !newName) {
+                return missingInfoError;
+            }
+
+            const command: Command = { intent: "update_employee", name: currentName };
+            if (newName) {
+                command.newName = newName;
+            }
+            if (newRole) {
+                command.newRole = newRole;
+            }
+
+            return command;
         }
-        default: return missingInfoError;
+
+        default:
+            return missingInfoError;
     }
 }
 
 export function parseCommand(input: string): Command | ErrorResponse {
-    const fallbackMessage: ErrorResponse = {
-        type: "error",
-        message: "I didn’t understand that. Try something like: 'create schedule saturday 2 cooks'",
-    };
-
     try {
         const words = normalize(input);
         const intent = detectIntent(words);
-        if (!intent) return fallbackMessage;
+        if (!intent) {
+            return fallbackMessage;
+        }
+
         return extractEntities(intent, words);
-    } catch (error) {
+    } catch {
         return fallbackMessage;
     }
 }

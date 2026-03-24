@@ -9,7 +9,15 @@ The system is built on a Client-Server architecture, utilizing a React-based fro
 ### Key Components
 
 #### Intent-Based Command Processor
-The application interprets plain English commands through a backend processing layer. It uses regex-based classification to identify user intent (e.g., `CREATE_SCHEDULE`, `FILL_SCHEDULE`, `SWAP_SHIFT`) and extracts relevant parameters such as days and roles.
+The application now has a simple LLM-ready intent interpretation layer. It keeps a central catalog of supported intents, required fields, examples, and decision rules so a future LLM can be plugged in later without changing the business logic.
+
+The interpretation flow is:
+- Send the English user request directly to the LLM.
+- If an LLM client is configured, send a small standardized prompt and expect a fixed JSON response shape.
+- Validate the returned command before using it.
+- If the LLM is unavailable, invalid, or not configured, safely fall back to the existing parser.
+
+This means the current behavior continues to work today, while the project is already prepared for a future LLM provider.
 
 #### Scheduling Engine
 The core business logic resides in the `ScheduleEngine` service. Its responsibilities include:
@@ -68,3 +76,20 @@ The system accepts commands through the integrated chat interface. Examples incl
 - "Fill schedule Sunday"
 - "Swap employee1 with employee2 on Saturday"
 - "Complete schedule Saturday"
+
+## LLM Readiness
+
+No specific LLM vendor is hard-coded yet.
+
+The backend does not require HTTP for the LLM integration. You can plug any future SDK or transport into the centralized interpreter service, as long as it returns the standard JSON shape below:
+
+```json
+{
+  "command": {
+    "intent": "assign",
+    "employee": "John",
+    "day": "saturday"
+  },
+  "reason": null
+}
+```

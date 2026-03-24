@@ -1,6 +1,9 @@
 import Database from "better-sqlite3"
+import path from "path"
 
-export const db = new Database("database.db")
+const databasePath = path.resolve(__dirname, "../../database.db")
+
+export const db = new Database(databasePath)
 
 db.exec(`
     CREATE TABLE IF NOT EXISTS employees (
