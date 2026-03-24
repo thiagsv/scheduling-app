@@ -1,3 +1,5 @@
+import path from "path"
+import dotenv from "dotenv"
 import express from "express"
 import employeeRoutes from "./routes/employeeRoutes"
 import commandRoutes from "./routes/commandRoutes"
@@ -5,6 +7,8 @@ import scheduleRoutes from "./routes/scheduleRoutes"
 import "./db/database"
 import { configureIntentLlmClient } from "./services/intentInterpreter"
 import { GeminiIntentClient } from "./services/geminiIntentClient"
+
+dotenv.config({ path: path.resolve(__dirname, "..", "..", ".env") })
 
 const geminiApiKey = process.env.GEMINI_API_KEY?.trim()
 if (geminiApiKey) {
