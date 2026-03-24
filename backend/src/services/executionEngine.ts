@@ -20,7 +20,7 @@ export const executeCommand = (command: Command) => {
             if (!emp) throw new Error("Employee not found for assignment");
 
             const allShifts = db.prepare(`SELECT id, role, day, employee_id FROM shifts`).all() as (Shift & { employee_id: number | null })[];
-            
+
             const assignToDay = (day: string) => {
                 const currentAssignments: Assignment[] = allShifts
                     .filter(s => s.employee_id !== null)
@@ -65,7 +65,7 @@ export const executeCommand = (command: Command) => {
                 .filter(s => s.employee_id !== null)
                 .map(s => ({ employeeId: s.employee_id!, shiftId: s.id }));
 
-            let shiftsToFill = command.day 
+            let shiftsToFill = command.day
                 ? allShifts.filter(s => s.day === command.day)
                 : allShifts;
 
