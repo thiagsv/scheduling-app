@@ -1,8 +1,6 @@
 import { db } from "../db/database";
 import { Command, Employee, Shift, Assignment } from "../types";
-import { ScheduleEngine } from "./ScheduleEngine";
-
-const engine = new ScheduleEngine();
+import { autoFill, isDoubleBooked } from "./scheduleEngine";
 
 export const executeCommand = (command: Command) => {
     switch (command.intent) {
@@ -29,7 +27,7 @@ export const executeCommand = (command: Command) => {
                     .map(s => ({ employeeId: s.employee_id!, shiftId: s.id }));
 
                 // Prevent double booking
-                if (engine.isDoubleBooked(emp.id, { day } as Shift, currentAssignments, allShifts)) {
+                if (isDoubleBooked(emp.id, { day } as Shift, currentAssignments, allShifts)) {
                     return; // Skip if already booked on this day
                 }
 
@@ -75,7 +73,7 @@ export const executeCommand = (command: Command) => {
                 shiftsToFill = shiftsToFill.filter(s => s.role === command.role);
             }
 
-            const newAssignments = engine.autoFill(shiftsToFill, allEmployees, currentAssignments, allShifts);
+            const newAssignments = autoFill(shiftsToFill, allEmployees, currentAssignments, allShifts);
 
             const assign = db.prepare(`UPDATE shifts SET employee_id = ? WHERE id = ?`);
 
@@ -109,7 +107,7 @@ export const executeCommand = (command: Command) => {
                     throw new Error(`${toEmp.name} cannot work as ${shiftToSwap.role}.`);
                 }
 
-                if (engine.isDoubleBooked(toEmp.id, shiftToSwap, currentAssignments, allShifts)) {
+                if (isDoubleBooked(toEmp.id, shiftToSwap, currentAssignments, allShifts)) {
                     throw new Error(`${toEmp.name} is already scheduled on ${command.day}.`);
                 }
 
@@ -120,7 +118,7 @@ export const executeCommand = (command: Command) => {
                     if (toEmp.role !== shift.role) {
                         throw new Error(`${toEmp.name} cannot replace ${fromEmp.name} on ${shift.day} (${shift.role}).`);
                     }
-                    if (engine.isDoubleBooked(toEmp.id, shift, currentAssignments, allShifts)) {
+                    if (isDoubleBooked(toEmp.id, shift, currentAssignments, allShifts)) {
                         throw new Error(`${toEmp.name} is already scheduled on ${shift.day}.`);
                     }
                 }
