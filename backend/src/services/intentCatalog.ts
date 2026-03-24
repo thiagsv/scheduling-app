@@ -238,7 +238,7 @@ export const INTENT_CATALOG: IntentDefinition[] = [
         examples: [
             "Update John to manager",
             "Rename Maria to Mariana",
-            "Atualize a Ana para gerente",
+            "Change Alice to host",
         ],
         selectionRules: [
             "Use this intent only when the employee already exists.",
