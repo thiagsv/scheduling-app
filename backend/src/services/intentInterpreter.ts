@@ -120,6 +120,20 @@ function buildIntentSummary(): string {
     }).join("\n");
 }
 
+function buildInterpretationRules(): string {
+    return [
+        "- Return a command when all required fields for the matched intent are present.",
+        "- Return a question when the request matches a supported intent but required information is missing.",
+        "- Never ask for optional fields just because they were omitted.",
+        "- fill_schedule is valid with no day and no role filters.",
+        "- assign is valid with an employee only. The day is optional.",
+        "- update_employee is valid when the employee name is known and at least one of newName or newRole is present.",
+        "- create_schedule is valid when the day is known and at least one role/count pair is known.",
+        "- swap needs two employee names. If one is missing, ask for it.",
+        "- create_employee needs both a name and a role. If one is missing, ask for it.",
+    ].join("\n");
+}
+
 function buildLlmRequest(
     input: string,
     context: IntentInterpreterContext,
@@ -146,12 +160,13 @@ function buildLlmRequest(
         userPrompt: [
             "Supported intents:",
             buildIntentSummary(),
+            "Interpretation rules:",
+            buildInterpretationRules(),
             `Allowed days: ${DAYS.join(", ")}.`,
             `Allowed roles: ${ROLES.join(", ")}.`,
             `Known employees: ${employees}.`,
             `User request: ${input.trim()}.`,
             "If the request is a follow-up answer, combine it with the earlier request and question.",
-            "A create_schedule command is valid when the day is known and at least one role/count pair is known.",
             "Only include roles that the user actually provided.",
             "If you have enough information, return a command.",
             "If information is missing, return exactly one short follow-up question.",
