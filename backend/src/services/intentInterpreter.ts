@@ -1,5 +1,4 @@
 import {
-    Command,
     CommandInterpretationResult,
     EmployeeContext,
     ErrorResponse,
@@ -7,8 +6,14 @@ import {
     MessageResponse,
     QuestionResponse,
 } from "../types";
-import { coerceCommand } from "./commandValidation";
 import { DAYS, INTENT_CATALOG, ROLES } from "./intentCatalog";
+import {
+    executeIntentToolCall,
+    IntentToolCall,
+    IntentToolDefinition,
+    SUBMIT_SCHEDULING_COMMAND_TOOL,
+    SUBMIT_SCHEDULING_COMMAND_TOOL_NAME,
+} from "./intentTools";
 import { getEmployeeContext } from "./nluUtils";
 import {
     MISSING_INFO_ERROR_MESSAGE,
@@ -21,8 +26,10 @@ type IntentInterpreterContext = {
 };
 
 type StandardLlmResponse = {
-    type?: "command" | "question" | "message";
+    type?: "tool_call" | "command" | "question" | "message";
     command?: unknown | null;
+    toolName?: string | null;
+    toolArguments?: unknown | null;
     question?: string | null;
     message?: string | null;
     reason?: string | null;
@@ -32,16 +39,19 @@ export type IntentLlmRequest = {
     systemPrompt: string;
     userPrompt: string;
     responseSchema: Record<string, unknown>;
+    tools: IntentToolDefinition[];
 };
 
 export interface IntentLlmClient {
-    complete(request: IntentLlmRequest): Promise<string | StandardLlmResponse | null>;
+    complete(request: IntentLlmRequest): Promise<string | StandardLlmResponse | IntentToolCall | null>;
 }
 
-const STANDARD_COMMAND_RESPONSE_EXAMPLE = JSON.stringify(
+const STANDARD_TOOL_CALL_RESPONSE_EXAMPLE = JSON.stringify(
     {
-        type: "command",
-        command: {
+        type: "tool_call",
+        command: null,
+        toolName: SUBMIT_SCHEDULING_COMMAND_TOOL_NAME,
+        toolArguments: {
             intent: "create_schedule",
             day: "monday",
             roles: [{ role: "cook", count: 1 }],
@@ -53,10 +63,27 @@ const STANDARD_COMMAND_RESPONSE_EXAMPLE = JSON.stringify(
     2,
 );
 
+const STANDARD_COMMAND_RESPONSE_EXAMPLE = JSON.stringify(
+    {
+        type: "command",
+        command: {
+            intent: "fill_schedule",
+        },
+        toolName: null,
+        toolArguments: null,
+        question: null,
+        message: null,
+    },
+    null,
+    2,
+);
+
 const STANDARD_QUESTION_RESPONSE_EXAMPLE = JSON.stringify(
     {
         type: "question",
         command: null,
+        toolName: null,
+        toolArguments: null,
         question: "Which roles and counts do you want on Monday?",
         message: null,
     },
@@ -68,6 +95,8 @@ const STANDARD_MESSAGE_RESPONSE_EXAMPLE = JSON.stringify(
     {
         type: "message",
         command: null,
+        toolName: null,
+        toolArguments: null,
         question: null,
         message: "I could not find an employee with that name.",
     },
@@ -81,11 +110,19 @@ const STANDARD_LLM_RESPONSE_SCHEMA = {
     properties: {
         type: {
             type: "string",
-            enum: ["command", "question", "message"],
+            enum: ["tool_call", "command", "question", "message"],
         },
         command: {
             type: ["object", "null"],
             description: "A scheduling command object using full English field values.",
+        },
+        toolName: {
+            type: ["string", "null"],
+            description: "The tool name to execute when type is tool_call.",
+        },
+        toolArguments: {
+            type: ["object", "null"],
+            description: "Arguments for the selected tool when type is tool_call.",
         },
         question: {
             type: ["string", "null"],
@@ -96,7 +133,7 @@ const STANDARD_LLM_RESPONSE_SCHEMA = {
             description: "A short assistant message when no command should be executed.",
         },
     },
-    required: ["type", "command", "question", "message"],
+    required: ["type", "command", "toolName", "toolArguments", "question", "message"],
 } as const;
 
 let llmClient: IntentLlmClient | null = null;
@@ -122,7 +159,8 @@ function buildIntentSummary(): string {
 
 function buildInterpretationRules(): string {
     return [
-        "- Return a command when all required fields for the matched intent are present.",
+        `- Prefer a tool_call to ${SUBMIT_SCHEDULING_COMMAND_TOOL_NAME} when all required fields for the matched intent are present.`,
+        "- You may return command JSON only as a compatibility fallback when a tool_call is not possible.",
         "- Return a question when the request matches a supported intent but required information is missing.",
         "- Never ask for optional fields just because they were omitted.",
         "- fill_schedule is valid with no day and no role filters.",
@@ -149,10 +187,12 @@ function buildLlmRequest(
             "Use full intent, day, and role names in the JSON response.",
             "Return only valid JSON.",
             "The input may include an original request, a follow-up question, and the user's follow-up answer. Combine all of them before deciding.",
+            `When enough information is available, return a tool_call for ${SUBMIT_SCHEDULING_COMMAND_TOOL_NAME}.`,
             "For create_schedule, one role/count pair is enough to return a valid command.",
             "Do not ask for every possible role. Only ask for the missing role/count information needed to create a valid command.",
             "Do not invent specific roles in a follow-up question. Ask generically for roles and counts unless the user already named the roles.",
             "Return one of these shapes:",
+            STANDARD_TOOL_CALL_RESPONSE_EXAMPLE,
             STANDARD_COMMAND_RESPONSE_EXAMPLE,
             STANDARD_QUESTION_RESPONSE_EXAMPLE,
             STANDARD_MESSAGE_RESPONSE_EXAMPLE,
@@ -165,19 +205,21 @@ function buildLlmRequest(
             `Allowed days: ${DAYS.join(", ")}.`,
             `Allowed roles: ${ROLES.join(", ")}.`,
             `Known employees: ${employees}.`,
+            `Available tool: ${SUBMIT_SCHEDULING_COMMAND_TOOL_NAME}.`,
             `User request: ${input.trim()}.`,
             "If the request is a follow-up answer, combine it with the earlier request and question.",
             "Only include roles that the user actually provided.",
-            "If you have enough information, return a command.",
+            `If you have enough information, return a tool_call for ${SUBMIT_SCHEDULING_COMMAND_TOOL_NAME}.`,
             "If information is missing, return exactly one short follow-up question.",
             "If the request should not be executed, return a short message.",
         ].join("\n\n"),
         responseSchema: STANDARD_LLM_RESPONSE_SCHEMA,
+        tools: [SUBMIT_SCHEDULING_COMMAND_TOOL],
     };
 }
 
 function parseStandardLlmResponse(
-    value: string | StandardLlmResponse | null,
+    value: string | StandardLlmResponse | IntentToolCall | null,
 ): StandardLlmResponse | null {
     if (!value) {
         return null;
@@ -196,6 +238,8 @@ function parseStandardLlmResponse(
         if (
             "type" in candidate ||
             "command" in candidate ||
+            "toolName" in candidate ||
+            "toolArguments" in candidate ||
             "question" in candidate ||
             "message" in candidate ||
             "reason" in candidate
@@ -218,12 +262,34 @@ function parseLlmResult(
         return null;
     }
 
-    const command = coerceCommand(response.command);
-    if (command) {
-        return {
-            command,
-            source: "llm",
-        };
+    if (response.type === "tool_call" && typeof response.toolName === "string") {
+        const toolCommand = executeIntentToolCall({
+            type: "tool_call",
+            toolName: response.toolName,
+            toolArguments: response.toolArguments,
+        });
+
+        if (toolCommand) {
+            return {
+                command: toolCommand,
+                source: "llm",
+            };
+        }
+    }
+
+    if (response.type === "command") {
+        const fallbackCommand = executeIntentToolCall({
+            type: "tool_call",
+            toolName: SUBMIT_SCHEDULING_COMMAND_TOOL_NAME,
+            toolArguments: response.command,
+        });
+
+        if (fallbackCommand) {
+            return {
+                command: fallbackCommand,
+                source: "llm",
+            };
+        }
     }
 
     const question = asNonEmptyString(response.question) ?? asNonEmptyString(response.reason);
