@@ -8,6 +8,7 @@ export default function Chat({
     setInput,
     handleSend,
     suggestions,
+    isClarifying,
 }) {
     const messagesEndRef = useRef(null);
 
@@ -39,13 +40,17 @@ export default function Chat({
             {/* suggestions */}
             <Suggestions suggestions={suggestions} onSelect={setInput} />
 
-            {/* input */}
             <div className="p-5 md:p-6 border-t border-gray-100">
+                {isClarifying && (
+                    <div className="mb-3 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-500">
+                        The assistant is waiting for one more detail before executing the command.
+                    </div>
+                )}
                 <div className="flex items-center gap-2 md:gap-3 bg-gray-100 rounded-full px-3 md:px-4 py-2.5 md:py-3 focus-within:ring-2 focus-within:ring-gray-300 transition">
                     <input
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
-                        placeholder="Type a command..."
+                        placeholder={isClarifying ? "Answer the follow-up..." : "Type a command..."}
                         className="flex-1 bg-transparent text-sm md:text-base focus:outline-none text-gray-900 placeholder-gray-400"
                         onKeyDown={(e) => {
                             if (e.key === "Enter") {

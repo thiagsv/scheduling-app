@@ -1,10 +1,18 @@
 import { Request, Response } from "express";
 import { executeCommand } from "../services/executionEngine";
 import { interpretCommand } from "../services/intentInterpreter";
-import { ErrorResponse } from "../types";
+import { ErrorResponse, MessageResponse, QuestionResponse } from "../types";
 
 function isErrorResponse(value: ErrorResponse | unknown): value is ErrorResponse {
     return typeof value === "object" && value !== null && "type" in value && value.type === "error";
+}
+
+function isQuestionResponse(value: QuestionResponse | unknown): value is QuestionResponse {
+    return typeof value === "object" && value !== null && "type" in value && value.type === "question";
+}
+
+function isMessageResponse(value: MessageResponse | unknown): value is MessageResponse {
+    return typeof value === "object" && value !== null && "type" in value && value.type === "message";
 }
 
 function describeSource(source: "llm" | "parser"): string {
@@ -32,9 +40,20 @@ export const handleCommand = async (req: Request, res: Response) => {
             return;
         }
 
+        if (isQuestionResponse(interpretation)) {
+            res.status(200).json(interpretation);
+            return;
+        }
+
+        if (isMessageResponse(interpretation)) {
+            res.status(200).json(interpretation);
+            return;
+        }
+
         executeCommand(interpretation.command);
 
         res.status(200).json({
+            type: "command",
             intent: interpretation.command.intent,
             command: interpretation.command,
             source: interpretation.source,

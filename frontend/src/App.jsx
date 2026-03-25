@@ -19,6 +19,7 @@ export default function App() {
     const [input, setInput] = useState("");
     const [schedule, setSchedule] = useState({});
     const [employees, setEmployees] = useState([]);
+    const [pendingClarification, setPendingClarification] = useState(null);
 
     const fetchData = () => {
         fetch("/employees")
@@ -48,10 +49,20 @@ export default function App() {
     ];
 
     const handleSend = async () => {
-        if (!input) return;
+        const trimmedInput = input.trim();
+        if (!trimmedInput) return;
 
-        const userMessage = { text: input, role: "user" };
+        const userMessage = { text: trimmedInput, role: "user" };
         setMessages((prev) => [...prev, userMessage]);
+        setInput("");
+
+        const commandText = pendingClarification
+            ? [
+                `Original user request: ${pendingClarification.originalCommand}`,
+                `Assistant follow-up question: ${pendingClarification.question}`,
+                `User answer: ${trimmedInput}`,
+            ].join("\n")
+            : trimmedInput;
 
         try {
             const res = await fetch("/command", {
@@ -59,7 +70,7 @@ export default function App() {
                 headers: {
                     "Content-Type": "application/json",
                 },
-                body: JSON.stringify({ command: input }),
+                body: JSON.stringify({ command: commandText }),
             });
 
             const data = await res.json();
@@ -75,8 +86,37 @@ export default function App() {
                 return;
             }
 
+            if (data.type === "question") {
+                setPendingClarification({
+                    originalCommand: pendingClarification?.originalCommand ?? trimmedInput,
+                    question: data.question,
+                });
+
+                setMessages((prev) => [
+                    ...prev,
+                    {
+                        text: data.question,
+                        role: "ai",
+                    },
+                ]);
+                return;
+            }
+
+            if (data.type === "message") {
+                setPendingClarification(null);
+                setMessages((prev) => [
+                    ...prev,
+                    {
+                        text: data.message,
+                        role: "ai",
+                    },
+                ]);
+                return;
+            }
+
             // Silently refetch data in background as part of standard state invalidation
             fetchData();
+            setPendingClarification(null);
 
             setMessages((prev) => [
                 ...prev,
@@ -92,7 +132,6 @@ export default function App() {
             ]);
         }
 
-        setInput("");
     };
 
     return (
@@ -100,12 +139,13 @@ export default function App() {
             <div className="w-full max-w-[1500px] flex flex-col md:flex-row h-[85vh] min-h-[640px] max-h-[900px] bg-white shadow-sm rounded-xl overflow-hidden border border-gray-200">
                 <EmployeeDirectory employees={employees} />
                 <Schedule schedule={schedule} />
-                <Chat 
-                    messages={messages} 
-                    input={input} 
-                    setInput={setInput} 
-                    handleSend={handleSend} 
-                    suggestions={suggestions} 
+                <Chat
+                    messages={messages}
+                    input={input}
+                    setInput={setInput}
+                    handleSend={handleSend}
+                    suggestions={suggestions}
+                    isClarifying={Boolean(pendingClarification)}
                 />
             </div>
         </div>
