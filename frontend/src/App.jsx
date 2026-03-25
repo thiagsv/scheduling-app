@@ -3,17 +3,6 @@ import EmployeeDirectory from "./components/EmployeeDirectory";
 import Schedule from "./components/Schedule";
 import Chat from "./components/Chat";
 
-function formatSourceLabel(source) {
-    switch (source) {
-        case "llm":
-            return "LLM";
-        case "parser":
-            return "parser fallback";
-        default:
-            return "unknown source";
-    }
-}
-
 export default function App() {
     const [messages, setMessages] = useState([]);
     const [input, setInput] = useState("");
@@ -37,6 +26,22 @@ export default function App() {
         fetchData();
     }, []);
 
+    const addMessage = (text, role) => {
+        setMessages((prev) => [...prev, { text, role }]);
+    };
+
+    const buildCommandText = (userInput) => {
+        if (!pendingClarification) {
+            return userInput;
+        }
+
+        return [
+            `Original user request: ${pendingClarification.originalCommand}`,
+            `Assistant follow-up question: ${pendingClarification.question}`,
+            `User answer: ${userInput}`,
+        ].join("\n");
+    };
+
     const suggestions = [
         "Create schedule Saturday with 2 cooks",
         "Create schedule Sunday with 1 manager and 3 waiters",
@@ -52,17 +57,9 @@ export default function App() {
         const trimmedInput = input.trim();
         if (!trimmedInput) return;
 
-        const userMessage = { text: trimmedInput, role: "user" };
-        setMessages((prev) => [...prev, userMessage]);
+        addMessage(trimmedInput, "user");
         setInput("");
-
-        const commandText = pendingClarification
-            ? [
-                `Original user request: ${pendingClarification.originalCommand}`,
-                `Assistant follow-up question: ${pendingClarification.question}`,
-                `User answer: ${trimmedInput}`,
-            ].join("\n")
-            : trimmedInput;
+        const commandText = buildCommandText(trimmedInput);
 
         try {
             const res = await fetch("/command", {
@@ -76,13 +73,7 @@ export default function App() {
             const data = await res.json();
 
             if (!res.ok) {
-                setMessages((prev) => [
-                    ...prev,
-                    {
-                        text: data.message || "Error processing command.",
-                        role: "ai",
-                    },
-                ]);
+                addMessage(data.message || "Error processing command.", "ai");
                 return;
             }
 
@@ -91,47 +82,22 @@ export default function App() {
                     originalCommand: pendingClarification?.originalCommand ?? trimmedInput,
                     question: data.question,
                 });
-
-                setMessages((prev) => [
-                    ...prev,
-                    {
-                        text: data.question,
-                        role: "ai",
-                    },
-                ]);
+                addMessage(data.question, "ai");
                 return;
             }
 
             if (data.type === "message") {
                 setPendingClarification(null);
-                setMessages((prev) => [
-                    ...prev,
-                    {
-                        text: data.message,
-                        role: "ai",
-                    },
-                ]);
+                addMessage(data.message, "ai");
                 return;
             }
 
-            // Silently refetch data in background as part of standard state invalidation
             fetchData();
             setPendingClarification(null);
-
-            setMessages((prev) => [
-                ...prev,
-                { 
-                    text: `Command interpreted: ${data.intent.replace(/_/g, ' ')} via ${formatSourceLabel(data.source)}`,
-                    role: "ai",
-                },
-            ]);
+            addMessage(data.message || `Command executed: ${data.intent.replace(/_/g, " ")}`, "ai");
         } catch (err) {
-            setMessages((prev) => [
-                ...prev,
-                { text: "Error connecting to server", role: "ai" },
-            ]);
+            addMessage("Error connecting to server", "ai");
         }
-
     };
 
     return (
