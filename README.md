@@ -1,6 +1,6 @@
 # Workforce Scheduling System
 
-A small workforce scheduling app that accepts natural-language commands and converts them into scheduling actions.
+A workforce scheduling app with a chat-based interface for creating, filling, and updating schedules with natural-language commands.
 
 ## Overview
 
@@ -9,7 +9,8 @@ The project has:
 - a React frontend with a chat-style interface
 - an Express + TypeScript backend
 - SQLite for persistence
-- an LLM-first command interpretation flow
+- an LLM-first interpretation flow with structured responses
+- short follow-up questions when the LLM needs more information
 - a local parser fallback when the LLM is unavailable or invalid
 
 ## How It Works
@@ -17,11 +18,12 @@ The project has:
 At a high level:
 
 1. the user sends a command
-2. the backend interprets the intent
-3. the command is validated
-4. the scheduling action is executed
+2. the backend interprets the request with Gemini or the local parser fallback
+3. when needed, the assistant asks a short follow-up question before acting
+4. the command is validated
+5. the scheduling action is executed
 
-The backend can use Gemini for interpretation. If Gemini is not configured or fails, the system falls back to the local parser.
+The main path uses Gemini to return a structured `tool_call`, `question`, or `message`. If Gemini is not configured or fails, the system falls back to the local parser.
 
 ## Main Intents
 
@@ -87,7 +89,9 @@ npm run dev
 ## Example Commands
 
 - `Create schedule Saturday with 2 cooks`
+- `Create schedule Monday`
 - `Fill schedule Saturday`
+- `Full schedule Monday with cook`
 - `Assign Maria to Sunday`
 - `Swap John with Jane on Saturday`
 - `Create employee Lucas as waiter`
