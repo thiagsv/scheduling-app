@@ -1,15 +1,10 @@
 import { IntentLlmClient, IntentLlmRequest } from "./intentInterpreter";
-import { IntentToolCall } from "./intentTools";
 
 type GeminiGenerateContentResponse = {
     candidates?: Array<{
         content?: {
             parts?: Array<{
                 text?: string;
-                functionCall?: {
-                    name?: string;
-                    args?: unknown;
-                };
             }>;
         };
     }>;
@@ -25,7 +20,7 @@ export class GeminiIntentClient implements IntentLlmClient {
         private readonly baseUrl = "https://generativelanguage.googleapis.com/v1beta",
     ) {}
 
-    public async complete(request: IntentLlmRequest): Promise<string | IntentToolCall | null> {
+    public async complete(request: IntentLlmRequest): Promise<string | null> {
         const response = await fetch(
             `${this.baseUrl}/models/${this.model}:generateContent`,
             {
@@ -44,17 +39,6 @@ export class GeminiIntentClient implements IntentLlmClient {
                             parts: [{ text: request.userPrompt }],
                         },
                     ],
-                    tools: request.tools.length > 0
-                        ? [
-                            {
-                                functionDeclarations: request.tools.map((tool) => ({
-                                    name: tool.name,
-                                    description: tool.description,
-                                    parametersJsonSchema: tool.parameters,
-                                })),
-                            },
-                        ]
-                        : undefined,
                     generationConfig: {
                         responseMimeType: "application/json",
                         responseJsonSchema: request.responseSchema,
@@ -73,17 +57,6 @@ export class GeminiIntentClient implements IntentLlmClient {
             throw new Error(`Gemini blocked the prompt: ${data.promptFeedback.blockReason}`);
         }
 
-        const parts = data.candidates?.[0]?.content?.parts ?? [];
-        const functionCallPart = parts.find((part) => part.functionCall?.name);
-
-        if (functionCallPart?.functionCall?.name) {
-            return {
-                type: "tool_call",
-                toolName: functionCallPart.functionCall.name,
-                toolArguments: functionCallPart.functionCall.args ?? null,
-            };
-        }
-
-        return parts.find((part) => part.text)?.text ?? null;
+        return data.candidates?.[0]?.content?.parts?.find((part) => part.text)?.text ?? null;
     }
 }

@@ -9,9 +9,6 @@ import {
 import { DAYS, INTENT_CATALOG, ROLES } from "./intentCatalog";
 import {
     executeIntentToolCall,
-    IntentToolCall,
-    IntentToolDefinition,
-    SUBMIT_SCHEDULING_COMMAND_TOOL,
     SUBMIT_SCHEDULING_COMMAND_TOOL_NAME,
 } from "./intentTools";
 import { getEmployeeContext } from "./nluUtils";
@@ -38,11 +35,10 @@ export type IntentLlmRequest = {
     systemPrompt: string;
     userPrompt: string;
     responseSchema: Record<string, unknown>;
-    tools: IntentToolDefinition[];
 };
 
 export interface IntentLlmClient {
-    complete(request: IntentLlmRequest): Promise<string | StandardLlmResponse | IntentToolCall | null>;
+    complete(request: IntentLlmRequest): Promise<string | StandardLlmResponse | null>;
 }
 
 const STANDARD_TOOL_CALL_RESPONSE_EXAMPLE = JSON.stringify(
@@ -139,12 +135,116 @@ function buildInterpretationRules(): string {
         `- Prefer a tool_call to ${SUBMIT_SCHEDULING_COMMAND_TOOL_NAME} when all required fields for the matched intent are present.`,
         "- Return a question when the request matches a supported intent but required information is missing.",
         "- Never ask for optional fields just because they were omitted.",
+        "- Use known employees to ground employee names. Do not invent employees.",
+        "- If a word does not match a known employee, do not assume it is an employee name.",
         "- fill_schedule is valid with no day and no role filters.",
         "- assign is valid with an employee only. The day is optional.",
         "- update_employee is valid when the employee name is known and at least one of newName or newRole is present.",
         "- create_schedule is valid when the day is known and at least one role/count pair is known.",
         "- swap needs two employee names. If one is missing, ask for it.",
         "- create_employee needs both a name and a role. If one is missing, ask for it.",
+        "- Prefer fill_schedule when the user asks to fill, complete, or fully staff a schedule.",
+        "- Prefer create_schedule only when the user is defining schedule capacity with role/count pairs.",
+    ].join("\n");
+}
+
+function buildLanguageHints(): string {
+    return [
+        "- 'fill schedule', 'complete schedule', and 'full schedule' usually mean fill_schedule.",
+        "- 'full schedule monday' means fill_schedule with day = monday.",
+        "- 'full schedule monday with cook' means fill_schedule with day = monday and role = cook.",
+        "- 'swap monday' means swap is intended, but two employee names are still required.",
+        "- 'swap' without two employee names should return a follow-up question.",
+        "- 'create schedule monday' without counts should ask for roles and counts instead of creating a partial command.",
+        "- If the user names one valid employee in a swap request but not the other, ask for the missing employee.",
+    ].join("\n");
+}
+
+function buildDecisionExamples(): string {
+    return [
+        'User request: "Fill schedule"',
+        JSON.stringify(
+            {
+                type: "tool_call",
+                toolName: SUBMIT_SCHEDULING_COMMAND_TOOL_NAME,
+                toolArguments: {
+                    intent: "fill_schedule",
+                },
+                question: null,
+                message: null,
+            },
+            null,
+            2,
+        ),
+        'User request: "Full schedule monday"',
+        JSON.stringify(
+            {
+                type: "tool_call",
+                toolName: SUBMIT_SCHEDULING_COMMAND_TOOL_NAME,
+                toolArguments: {
+                    intent: "fill_schedule",
+                    day: "monday",
+                },
+                question: null,
+                message: null,
+            },
+            null,
+            2,
+        ),
+        'User request: "Full schedule monday with cook"',
+        JSON.stringify(
+            {
+                type: "tool_call",
+                toolName: SUBMIT_SCHEDULING_COMMAND_TOOL_NAME,
+                toolArguments: {
+                    intent: "fill_schedule",
+                    day: "monday",
+                    role: "cook",
+                },
+                question: null,
+                message: null,
+            },
+            null,
+            2,
+        ),
+        'User request: "Swap"',
+        JSON.stringify(
+            {
+                type: "question",
+                toolName: null,
+                toolArguments: null,
+                question: "Which two employees should I swap?",
+                message: null,
+            },
+            null,
+            2,
+        ),
+        'User request: "Swap monday"',
+        JSON.stringify(
+            {
+                type: "question",
+                toolName: null,
+                toolArguments: null,
+                question: "Which two employees should I swap on Monday?",
+                message: null,
+            },
+            null,
+            2,
+        ),
+        'User request: "Swap cookies on monday"',
+        JSON.stringify(
+            {
+                type: "question",
+                toolName: null,
+                toolArguments: null,
+                question: "Which two employees should I swap on Monday?",
+                message: null,
+            },
+            null,
+            2,
+        ),
+        'User request: "Create schedule monday"',
+        STANDARD_QUESTION_RESPONSE_EXAMPLE,
     ].join("\n");
 }
 
@@ -159,10 +259,14 @@ function buildSystemPrompt(): string {
         "For create_schedule, one role/count pair is enough to return a valid command.",
         "Do not ask for every possible role. Only ask for the missing role/count information needed to create a valid command.",
         "Do not invent specific roles in a follow-up question. Ask generically for roles and counts unless the user already named the roles.",
+        "Language hints:",
+        buildLanguageHints(),
         "Return one of these shapes:",
         STANDARD_TOOL_CALL_RESPONSE_EXAMPLE,
         STANDARD_QUESTION_RESPONSE_EXAMPLE,
         STANDARD_MESSAGE_RESPONSE_EXAMPLE,
+        "Decision examples:",
+        buildDecisionExamples(),
     ].join("\n");
 }
 
@@ -197,12 +301,11 @@ function buildLlmRequest(
         systemPrompt: buildSystemPrompt(),
         userPrompt: buildUserPrompt(input, context),
         responseSchema: STANDARD_LLM_RESPONSE_SCHEMA,
-        tools: [SUBMIT_SCHEDULING_COMMAND_TOOL],
     };
 }
 
 function parseStandardLlmResponse(
-    value: string | StandardLlmResponse | IntentToolCall | null,
+    value: string | StandardLlmResponse | null,
 ): StandardLlmResponse | null {
     if (!value) {
         return null;
