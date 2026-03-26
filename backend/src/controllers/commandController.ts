@@ -37,7 +37,7 @@ export const handleCommand = async (req: Request, res: Response) => {
         executeCommand(interpretation.command);
 
         res.status(200).json({
-            type: "command",
+            type: "success",
             intent: interpretation.command.intent,
             command: interpretation.command,
             source: interpretation.source,
