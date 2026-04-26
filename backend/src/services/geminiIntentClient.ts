@@ -57,6 +57,6 @@ export class GeminiIntentClient implements IntentLlmClient {
             throw new Error(`Gemini blocked the prompt: ${data.promptFeedback.blockReason}`);
         }
 
-        return data.candidates?.[0]?.content?.parts?.[0]?.text ?? null;
+        return data.candidates?.[0]?.content?.parts?.find((part) => part.text)?.text ?? null;
     }
 }

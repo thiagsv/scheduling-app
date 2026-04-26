@@ -3,22 +3,12 @@ import EmployeeDirectory from "./components/EmployeeDirectory";
 import Schedule from "./components/Schedule";
 import Chat from "./components/Chat";
 
-function formatSourceLabel(source) {
-    switch (source) {
-        case "llm":
-            return "LLM";
-        case "parser":
-            return "parser fallback";
-        default:
-            return "unknown source";
-    }
-}
-
 export default function App() {
     const [messages, setMessages] = useState([]);
     const [input, setInput] = useState("");
     const [schedule, setSchedule] = useState({});
     const [employees, setEmployees] = useState([]);
+    const [pendingClarification, setPendingClarification] = useState(null);
 
     const fetchData = () => {
         fetch("/employees")
@@ -36,6 +26,22 @@ export default function App() {
         fetchData();
     }, []);
 
+    const addMessage = (text, role) => {
+        setMessages((prev) => [...prev, { text, role }]);
+    };
+
+    const buildCommandText = (userInput) => {
+        if (!pendingClarification) {
+            return userInput;
+        }
+
+        return [
+            `Original user request: ${pendingClarification.originalCommand}`,
+            `Assistant follow-up question: ${pendingClarification.question}`,
+            `User answer: ${userInput}`,
+        ].join("\n");
+    };
+
     const suggestions = [
         "Create schedule Saturday with 2 cooks",
         "Create schedule Sunday with 1 manager and 3 waiters",
@@ -48,10 +54,12 @@ export default function App() {
     ];
 
     const handleSend = async () => {
-        if (!input) return;
+        const trimmedInput = input.trim();
+        if (!trimmedInput) return;
 
-        const userMessage = { text: input, role: "user" };
-        setMessages((prev) => [...prev, userMessage]);
+        addMessage(trimmedInput, "user");
+        setInput("");
+        const commandText = buildCommandText(trimmedInput);
 
         try {
             const res = await fetch("/command", {
@@ -59,40 +67,37 @@ export default function App() {
                 headers: {
                     "Content-Type": "application/json",
                 },
-                body: JSON.stringify({ command: input }),
+                body: JSON.stringify({ command: commandText }),
             });
 
             const data = await res.json();
 
             if (!res.ok) {
-                setMessages((prev) => [
-                    ...prev,
-                    {
-                        text: data.message || "Error processing command.",
-                        role: "ai",
-                    },
-                ]);
+                addMessage(data.message || "Error processing command.", "ai");
                 return;
             }
 
-            // Silently refetch data in background as part of standard state invalidation
+            if (data.type === "question") {
+                setPendingClarification({
+                    originalCommand: pendingClarification?.originalCommand ?? trimmedInput,
+                    question: data.question,
+                });
+                addMessage(data.question, "ai");
+                return;
+            }
+
+            if (data.type === "message") {
+                setPendingClarification(null);
+                addMessage(data.message, "ai");
+                return;
+            }
+
             fetchData();
-
-            setMessages((prev) => [
-                ...prev,
-                { 
-                    text: `Command interpreted: ${data.intent.replace(/_/g, ' ')} via ${formatSourceLabel(data.source)}`,
-                    role: "ai",
-                },
-            ]);
+            setPendingClarification(null);
+            addMessage(data.message || `Command executed: ${data.intent.replace(/_/g, " ")}`, "ai");
         } catch (err) {
-            setMessages((prev) => [
-                ...prev,
-                { text: "Error connecting to server", role: "ai" },
-            ]);
+            addMessage("Error connecting to server", "ai");
         }
-
-        setInput("");
     };
 
     return (
@@ -100,12 +105,13 @@ export default function App() {
             <div className="w-full max-w-[1500px] flex flex-col md:flex-row h-[85vh] min-h-[640px] max-h-[900px] bg-white shadow-sm rounded-xl overflow-hidden border border-gray-200">
                 <EmployeeDirectory employees={employees} />
                 <Schedule schedule={schedule} />
-                <Chat 
-                    messages={messages} 
-                    input={input} 
-                    setInput={setInput} 
-                    handleSend={handleSend} 
-                    suggestions={suggestions} 
+                <Chat
+                    messages={messages}
+                    input={input}
+                    setInput={setInput}
+                    handleSend={handleSend}
+                    suggestions={suggestions}
+                    isClarifying={Boolean(pendingClarification)}
                 />
             </div>
         </div>

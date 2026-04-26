@@ -9,16 +9,20 @@ import {
     resolveEmployeeName,
 } from "./nluUtils";
 
+export const MISSING_INFO_ERROR_MESSAGE =
+    "I understood the intent, but some information is missing. Try including the employee, role, or day.";
+
+export const PARSE_FALLBACK_MESSAGE =
+    "I didn’t understand that. Try: 'create schedule saturday 2 cooks'.";
+
 const missingInfoError: ErrorResponse = {
     type: "error",
-    message:
-        "I understood the intent, but some information is missing. Try including the employee, role, or day.",
+    message: MISSING_INFO_ERROR_MESSAGE,
 };
 
 const fallbackMessage: ErrorResponse = {
     type: "error",
-    message:
-        "I didn’t understand that. Try: 'create schedule saturday 2 cooks'.",
+    message: PARSE_FALLBACK_MESSAGE,
 };
 
 function detectIntent(words: string[]): IntentName | null {

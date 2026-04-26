@@ -48,6 +48,18 @@ export type ErrorResponse = {
     message: string;
 };
 
+export type QuestionResponse = {
+    type: "question";
+    question: string;
+    source: CommandInterpretationSource;
+};
+
+export type MessageResponse = {
+    type: "message";
+    message: string;
+    source: CommandInterpretationSource;
+};
+
 export type IntentParameterType =
     | "day"
     | "role"
@@ -79,3 +91,9 @@ export type InterpretedCommand = {
     command: Command;
     source: CommandInterpretationSource;
 };
+
+export type CommandInterpretationResult =
+    | InterpretedCommand
+    | QuestionResponse
+    | MessageResponse
+    | ErrorResponse;
